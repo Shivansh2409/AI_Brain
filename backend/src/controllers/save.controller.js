@@ -1,5 +1,5 @@
 // src/controllers/save.controller.js
-const { processAndSaveUrl } = require("../services/save.service");
+const { saveUrlQueue } = require("../queues/save.queue");
 
 const saveItemController = async (req, res) => {
   try {
@@ -9,14 +9,15 @@ const saveItemController = async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
-    const result = await processAndSaveUrl(url);
+    // Push to the BullMQ queue
+    await saveUrlQueue.add("process-url", { url });
 
-    return res.status(result.isNew ? 201 : 200).json({
-      message: result.isNew ? "Item saved successfully" : "Item already exists",
-      data: result.item,
+    // 202 Accepted means "Request received and is processing in background"
+    return res.status(202).json({
+      message: "URL added to the processing queue",
     });
   } catch (error) {
-    console.error("Error in saveItemController:", error);
+    console.error("Error queuing item:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
