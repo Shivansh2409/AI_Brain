@@ -14,4 +14,9 @@ app.use(express.json());
 // Routes
 app.use("/api", saveRoutes);
 
+app.get("/health", (req, res) => {
+  console.log("Health check hit!");
+  res.send("Server is alive!");
+});
+
 module.exports = app;

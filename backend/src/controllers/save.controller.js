@@ -3,6 +3,7 @@ const { saveUrlQueue } = require("../queues/save.queue");
 
 const saveItemController = async (req, res) => {
   try {
+    console.log("ha");
     const { url } = req.body;
 
     if (!url) {

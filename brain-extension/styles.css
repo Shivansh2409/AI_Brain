@@ -1,0 +1,33 @@
+body {
+  font-family: system-ui, sans-serif;
+  width: 250px;
+  margin: 0;
+  padding: 15px;
+  background: #0f172a;
+  color: white;
+}
+h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+button {
+  width: 100%;
+  padding: 10px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+button:hover {
+  background: #2563eb;
+}
+button:disabled {
+  background: #475569;
+  cursor: not-allowed;
+}
+p {
+  font-size: 13px;
+  color: #94a3b8;
+}
