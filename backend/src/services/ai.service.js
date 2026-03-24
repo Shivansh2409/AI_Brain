@@ -1,4 +1,3 @@
-// src/services/ai.service.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require("dotenv").config();
 

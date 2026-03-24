@@ -1,33 +1,58 @@
-// src/services/scraper.service.js
-const axios = require("axios");
-const cheerio = require("cheerio");
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+
+// Tell Puppeteer to use the Stealth plugin to bypass bot-blockers
+puppeteer.use(StealthPlugin());
 
 const scrapeWebpage = async (url) => {
+  let browser;
   try {
-    // 1. Fetch the raw HTML of the page
-    const response = await axios.get(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (AI Second Brain Bot)" }, // Prevents some blocks
+    console.log(`[Scraper] Firing up headless Chrome for: ${url}`);
+
+    // 1. Launch the hidden browser
+    browser = await puppeteer.launch({
+      headless: true, // true means it runs invisibly. Set to false if you want to watch it work!
+      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Prevents crashes on servers
     });
 
-    // 2. Load it into Cheerio to parse it
-    const $ = cheerio.load(response.data);
+    const page = await browser.newPage();
+
+    // Set a normal looking window size
+    await page.setViewport({ width: 1280, height: 800 });
+
+    // 2. Go to the URL and WAIT until the network is quiet (meaning JS finished loading)
+    console.log(`[Scraper] Navigating and waiting for React/JS to load...`);
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
 
     // 3. Extract the title
-    const title = $("title").text() || "No Title Found";
+    const title = await page.title();
 
-    // 4. Extract paragraphs and clean up the text
-    let content = "";
-    $("p, h1, h2, h3").each((i, element) => {
-      content += $(element).text() + "\n";
+    // 4. Extract the visible text directly from the browser's DOM
+    const content = await page.evaluate(() => {
+      // Clean up the page before grabbing text to avoid garbage data
+      const elementsToRemove = document.querySelectorAll(
+        "script, style, noscript, nav, footer, iframe",
+      );
+      elementsToRemove.forEach((el) => el.remove());
+
+      // Grab all the human-readable text left on the screen
+      return document.body.innerText;
     });
 
-    // 5. Trim the content if it's massively long (to save AI API costs)
-    const trimmedContent = content.substring(0, 5000);
+    // We can give Gemini up to ~10,000 characters safely for a good summary
+    const trimmedContent = content.substring(0, 10000);
 
     return { title, content: trimmedContent };
   } catch (error) {
-    console.error(`Failed to scrape ${url}:`, error.message);
+    console.error(`[Scraper] Failed to scrape ${url}:`, error.message);
     return { title: "Unknown Title", content: "Could not extract content." };
+  } finally {
+    // CRITICAL: You MUST close the browser, even if an error happens.
+    // Otherwise, you will have 50 invisible Chrome windows open and your computer will crash!
+    if (browser) {
+      await browser.close();
+      console.log(`[Scraper] Closed browser.`);
+    }
   }
 };
 

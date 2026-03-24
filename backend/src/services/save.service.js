@@ -1,4 +1,3 @@
-// src/services/save.service.js
 const SavedItem = require("../models/savedItems");
 const { scrapeWebpage } = require("./scraper.service");
 const { generateSummaryAndTags, generateEmbedding } = require("./ai.service");

@@ -1,4 +1,3 @@
-// src/controllers/save.controller.js
 const { saveUrlQueue } = require("../queues/save.queue");
 
 const saveItemController = async (req, res) => {

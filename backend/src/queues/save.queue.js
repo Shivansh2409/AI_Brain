@@ -1,4 +1,3 @@
-// src/queues/save.queue.js
 const { Queue } = require("bullmq");
 
 // Connect to default local Redis. In production, use process.env.REDIS_URL

@@ -1,4 +1,3 @@
-// src/services/search.service.js
 const SavedItem = require("../models/savedItems");
 const { generateEmbedding } = require("./ai.service");
 

@@ -1,4 +1,3 @@
-// src/controllers/search.controller.js
 const { semanticSearch } = require("../services/search.service");
 
 const searchItemsController = async (req, res) => {

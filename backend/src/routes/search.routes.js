@@ -1,4 +1,3 @@
-// src/routes/search.routes.js
 const express = require("express");
 const { searchItemsController } = require("../controllers/search.controller");
 

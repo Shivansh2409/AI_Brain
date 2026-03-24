@@ -1,4 +1,3 @@
-// src/workers/save.worker.js
 const { Worker } = require("bullmq");
 const { connection } = require("../queues/save.queue");
 const { processAndSaveUrl } = require("../services/save.service");
