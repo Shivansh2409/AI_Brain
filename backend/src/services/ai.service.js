@@ -52,4 +52,41 @@ const generateEmbedding = async (text) => {
   }
 };
 
-module.exports = { generateSummaryAndTags, generateEmbedding };
+const generateImageSummaryAndTags = async (base64Image, mimeType) => {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" },
+    });
+
+    const prompt = `
+      Look at this image. 
+      1. Extract any readable text from it.
+      2. Provide a 2-sentence summary of what the image shows or means.
+      3. Provide exactly 3 to 5 relevant tags/keywords.
+      Respond strictly with a JSON object using this exact schema: { "summary": "string", "tags": ["string", "string"] }
+    `;
+
+    const imagePart = {
+      inlineData: {
+        data: base64Image,
+        mimeType: mimeType,
+      },
+    };
+
+    // Pass BOTH the text prompt and the image part to Gemini
+    const result = await model.generateContent([prompt, imagePart]);
+    const responseText = result.response.text();
+
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error("[Gemini AI] Vision Error:", error.message);
+    return { summary: "Failed to analyze image.", tags: ["image-error"] };
+  }
+};
+
+module.exports = {
+  generateSummaryAndTags,
+  generateEmbedding,
+  generateImageSummaryAndTags,
+};

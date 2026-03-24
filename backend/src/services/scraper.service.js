@@ -22,7 +22,18 @@ const scrapeWebpage = async (url) => {
 
     // 2. Go to the URL and WAIT until the network is quiet (meaning JS finished loading)
     console.log(`[Scraper] Navigating and waiting for React/JS to load...`);
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+    try {
+      // dom content loaded is much faster than network idle2
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+
+      // Wait just 1.5 extra seconds for React/Angular apps to paint their text
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    } catch (navError) {
+      console.log(
+        `[Scraper] Page is taking too long to fully load. Scraping what we have so far!`,
+      );
+      // We DO NOT throw the error here. We just let the code continue to step 3!
+    }
 
     // 3. Extract the title
     const title = await page.title();

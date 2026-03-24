@@ -1,44 +1,79 @@
 const SavedItem = require("../models/savedItems");
 const { scrapeWebpage } = require("./scraper.service");
-const { scrapeYouTube } = require("./youtube.service"); // <--- 1. Import the new service
-const { generateSummaryAndTags, generateEmbedding } = require("./ai.service");
+const { scrapeYouTube } = require("./youtube.service");
+const { scrapePdf, fetchImageForGemini } = require("./media.service"); // <-- Import new service
+const {
+  generateSummaryAndTags,
+  generateEmbedding,
+  generateImageSummaryAndTags,
+} = require("./ai.service");
 
 const processAndSaveUrl = async (url) => {
   console.log(`[Pipeline] Starting process for: ${url}`);
 
   const existingItem = await SavedItem.findOne({ url });
-  if (existingItem) {
-    console.log(`[Pipeline] Item already exists. Skipping.`);
-    return existingItem;
-  }
+  if (existingItem) return existingItem;
 
-  // 2. DETECT THE CONTENT TYPE
-  const isYouTube = url.includes("youtube.com") || url.includes("youtu.be");
+  // 1. DETECT CONTENT TYPE BY URL EXTENSION
+  const lowerUrl = url.toLowerCase();
+  const isYouTube =
+    lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be");
+  const isPdf = lowerUrl.endsWith(".pdf");
+  const isImage =
+    lowerUrl.endsWith(".png") ||
+    lowerUrl.endsWith(".jpg") ||
+    lowerUrl.endsWith(".jpeg") ||
+    lowerUrl.endsWith(".webp");
+
   let title, content, itemType;
+  let summary, tags;
 
-  // 3. ROUTE TO THE CORRECT SCRAPER
+  // 2. ROUTE AND PROCESS
   if (isYouTube) {
-    console.log(`[Pipeline] Detected YouTube URL. Bypassing Puppeteer...`);
     const ytData = await scrapeYouTube(url);
     title = ytData.title;
     content = ytData.content;
-    itemType = "youtube"; // Tag it as a video in the database
+    itemType = "youtube";
+    const aiData = await generateSummaryAndTags(content);
+    summary = aiData.summary;
+    tags = aiData.tags;
+  } else if (isPdf) {
+    console.log(`[Pipeline] Detected PDF Document...`);
+    const pdfData = await scrapePdf(url);
+    title = pdfData.title;
+    content = pdfData.content;
+    itemType = "pdf";
+    const aiData = await generateSummaryAndTags(content);
+    summary = aiData.summary;
+    tags = aiData.tags;
+  } else if (isImage) {
+    console.log(`[Pipeline] Detected Image. Activating Gemini Vision...`);
+    const imgData = await fetchImageForGemini(url);
+    title = imgData.title;
+    content = "Image saved directly. See summary.";
+    itemType = "image";
+    // Use the special Image AI function!
+    const aiData = await generateImageSummaryAndTags(
+      imgData.base64Image,
+      imgData.mimeType,
+    );
+    summary = aiData.summary;
+    tags = aiData.tags;
   } else {
-    console.log(`[Pipeline] Detected standard webpage. Launching Puppeteer...`);
+    // Default to standard webpage
     const webData = await scrapeWebpage(url);
     title = webData.title;
     content = webData.content;
     itemType = "article";
+    const aiData = await generateSummaryAndTags(content);
+    summary = aiData.summary;
+    tags = aiData.tags;
   }
 
-  // 4. Send to Gemini (The AI doesn't care if it's reading an article or a video transcript!)
-  console.log(`[Pipeline] Generating AI summary and tags...`);
-  const { summary, tags } = await generateSummaryAndTags(content);
-
+  // 3. GENERATE EMBEDDING & SAVE (Same for all types!)
   console.log(`[Pipeline] Generating Vector Embedding...`);
   const embedding = await generateEmbedding(summary + " " + title);
 
-  console.log(`[Pipeline] Saving to MongoDB...`);
   const newItem = await SavedItem.create({
     url,
     title,
@@ -46,10 +81,10 @@ const processAndSaveUrl = async (url) => {
     summary,
     tags,
     embedding,
-    itemType, // Saves as 'youtube' or 'article' dynamically
+    itemType,
   });
 
-  console.log(`[Pipeline] ✅ Success! Item saved with ID: ${newItem._id}`);
+  console.log(`[Pipeline] ✅ Success! Item saved as: ${itemType}`);
   return newItem;
 };
 
