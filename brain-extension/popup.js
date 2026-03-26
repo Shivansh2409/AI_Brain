@@ -1,37 +1,49 @@
 document.getElementById("save-btn").addEventListener("click", async () => {
-  const statusText = document.getElementById("status-text");
   const btn = document.getElementById("save-btn");
+  const btnText = document.getElementById("btn-text");
+  const btnIcon = document.getElementById("btn-icon");
+  const statusMsg = document.getElementById("status-msg");
 
-  btn.disabled = true;
-  statusText.innerText = "Saving...";
+  // 1. Enter Loading State
+  btn.classList.add("loading");
+  btnText.innerText = "Analyzing Page...";
+  btnIcon.style.display = "none"; // Hide the save icon while loading
+  statusMsg.className = "status hidden";
 
   try {
-    // 1. Get the current active tab
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    const currentUrl = tab.url;
+    // Get the current active tab
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    // 2. Send the URL to our backend
+    // Send the URL to your backend (Make sure this matches your actual endpoint!)
     const response = await fetch("http://localhost:3000/api/save", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url: currentUrl }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: tab.url }),
     });
 
-    if (response.ok) {
-      statusText.innerText = "✅ Saved to Brain!";
-      btn.style.display = "none"; // Hide button on success
-    } else {
-      console.log(response);
-      statusText.innerText = "❌ Failed to save.";
-      btn.disabled = false;
-    }
+    if (!response.ok) throw new Error("Server rejected the request");
+
+    // 2. Enter Success State
+    btn.classList.remove("loading");
+    btn.classList.add("success");
+    btnText.innerText = "Saved to Brain!";
+
+    statusMsg.innerText = "Summarized, tagged, and vectorized.";
+    statusMsg.className = "status success-text";
+
+    // Automatically close the popup after 2 seconds
+    setTimeout(() => {
+      window.close();
+    }, 2000);
   } catch (error) {
-    statusText.innerText = "❌ Server offline.";
-    btn.disabled = false;
+    console.error(error);
+
+    // 3. Enter Error State
+    btn.classList.remove("loading");
+    btnText.innerText = "Try Again";
+    btnIcon.style.display = "block"; // Bring icon back
+
+    statusMsg.innerText = "Failed to save. Is your backend running?";
+    statusMsg.className = "status error-text";
   }
 });

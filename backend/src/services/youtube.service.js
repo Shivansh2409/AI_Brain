@@ -1,68 +1,65 @@
-// src/services/youtube.service.js
 const axios = require("axios");
-const { getSubtitles } = require("youtube-captions-scraper");
-
-// Helper function to extract the 11-character Video ID
-function extractVideoID(url) {
-  const regExp =
-    /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const match = url.match(regExp);
-  return match && match[2].length === 11 ? match[2] : null;
-}
 
 const scrapeYouTube = async (url) => {
   console.log(`[YouTube Service] Extracting video data for: ${url}`);
-
   let title = "Unknown YouTube Video";
+  let description = "";
 
   try {
-    // 1. Get the Video Title
-    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-    const oembedRes = await axios.get(oembedUrl);
-    title = oembedRes.data.title;
-
-    // 2. Extract the Video ID
-    const videoId = extractVideoID(url);
-    if (!videoId) {
-      throw new Error("Could not extract Video ID from URL");
-    }
-
-    // 3. Language Fallback Array (Finds English, Hindi, or Auto-generated)
-    const languagesToTry = ["en", "hi", "en-IN", "a.en"];
-    let captions = null;
-
-    for (const lang of languagesToTry) {
-      try {
-        captions = await getSubtitles({ videoID: videoId, lang: lang });
-        console.log(
-          `[YouTube Service] ✅ Success! Found captions in language: ${lang}`,
-        );
-        break; // Stop looking once we find a valid track
-      } catch (err) {
-        // Silently fail and try the next language
-      }
-    }
-
-    if (!captions) {
-      throw new Error("No readable captions found in tested languages.");
-    }
-
-    // Combine all the spoken text blocks
-    const content = captions.map((caption) => caption.text).join(" ");
-
-    // 4. Trim it to fit inside Gemini's context window safely
-    const trimmedContent = content.substring(0, 15000);
-
-    return { title, content: trimmedContent };
-  } catch (error) {
-    console.error(
-      `[YouTube Service] Failed to extract transcript:`,
-      error.message,
+    console.log(
+      `[YouTube Service] Downloading raw YouTube HTML to find description...`,
     );
+
+    // 1. Fetch the raw HTML exactly like a Chrome browser
+    const { data: html } = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+
+    // 2. Extract the Title
+    const titleMatch = html.match(/<title>(.*?)<\/title>/);
+    if (titleMatch) title = titleMatch[1].replace(" - YouTube", "");
+
+    // 3. Extract the Description
+    // YouTube stores the full description in a hidden JSON object called "shortDescription"
+    const jsonDescMatch = html.match(/"shortDescription":"(.*?)"/);
+
+    if (jsonDescMatch && jsonDescMatch[1]) {
+      // Clean up the weird formatting (like \n for newlines) YouTube adds to the code
+      description = jsonDescMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    } else {
+      // Fallback: Grab the shorter meta description if the main one fails
+      const metaDescMatch = html.match(
+        /<meta name="description" content="(.*?)">/,
+      );
+      if (metaDescMatch) description = metaDescMatch[1];
+    }
+
+    console.log(`[YouTube Service] ✅ Success! Title: "${title}"`);
+    console.log(
+      `[YouTube Service] ✅ Success! Found a ${description.length} character description.`,
+    );
+
+    // 4. Send the context to Gemini with strict rules
+    const content = `
+      This is a YouTube video link. I was unable to download the spoken transcript. 
+      However, I have the exact title and the creator's written description of the video.
+      
+      Title: "${title}"
+      Description: "${description}"
+      
+      Please write a highly accurate 2-to-3 sentence summary of what this video is about based ONLY on the title and description provided. Do not invent or guess details outside of this context.
+    `;
+
+    return { title, content };
+  } catch (error) {
+    console.error(`[YouTube Service] Failed to extract data:`, error.message);
     return {
-      title,
-      content:
-        "Could not extract transcript. The creator disabled captions, or the language is unsupported.",
+      title: "Unknown YouTube Video",
+      content: "Could not extract data. The video might be private or deleted.",
     };
   }
 };

@@ -5,6 +5,7 @@ require("./workers/save.worker");
 const saveRoutes = require("./routes/save.routes");
 const searchRoutes = require("./routes/search.routes");
 const feedRoutes = require("./routes/feed.routes");
+const linkRoutes = require("./routes/link.routes");
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use("/api", saveRoutes);
 app.use("/api", searchRoutes);
 app.use("/api", feedRoutes);
+app.use("/api", linkRoutes);
 
 app.get("/health", (req, res) => {
   console.log("Health check hit!");
