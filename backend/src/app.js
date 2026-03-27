@@ -6,6 +6,7 @@ const saveRoutes = require("./routes/save.routes");
 const searchRoutes = require("./routes/search.routes");
 const feedRoutes = require("./routes/feed.routes");
 const linkRoutes = require("./routes/link.routes");
+const uploadRoutes = require("./routes/upload.routes");
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use("/api", saveRoutes);
 app.use("/api", searchRoutes);
 app.use("/api", feedRoutes);
 app.use("/api", linkRoutes);
+app.use("/api", uploadRoutes);
 
 app.get("/health", (req, res) => {
   console.log("Health check hit!");

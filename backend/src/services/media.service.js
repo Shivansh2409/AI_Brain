@@ -1,31 +1,8 @@
 const axios = require("axios");
-const pdfParse = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
+const puppeteer = require("puppeteer");
 
 // 1. Process PDFs
-const scrapePdf = async (url) => {
-  console.log(`[Media Service] Downloading PDF: ${url}`);
-  try {
-    // Download the file into computer memory as a raw buffer
-    const response = await axios.get(url, { responseType: "arraybuffer" });
-
-    // Parse the PDF buffer into readable text
-    const data = await pdfParse(response.data);
-
-    // Some PDFs have metadata titles, otherwise fallback
-    const title =
-      data.info?.Title || url.split("/").pop() || "Saved PDF Document";
-    const content = data.text.trim();
-
-    // Trim to fit Gemini's context window safely
-    return { title, content: content.substring(0, 15000) };
-  } catch (error) {
-    console.error(`[Media Service] PDF Error:`, error.message);
-    return {
-      title: "Unknown PDF",
-      content: "Failed to extract text from PDF.",
-    };
-  }
-};
 
 // 2. Process Images (Prepare them for Gemini)
 const fetchImageForGemini = async (url) => {
@@ -48,4 +25,4 @@ const fetchImageForGemini = async (url) => {
   }
 };
 
-module.exports = { scrapePdf, fetchImageForGemini };
+module.exports = { fetchImageForGemini };

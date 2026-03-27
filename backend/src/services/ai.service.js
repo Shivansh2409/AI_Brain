@@ -11,7 +11,7 @@ const generateSummaryAndTags = async (text) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       generationConfig: {
         responseMimeType: "application/json", // This forces Gemini to output clean JSON!
       },
@@ -55,7 +55,7 @@ const generateEmbedding = async (text) => {
 const generateImageSummaryAndTags = async (base64Image, mimeType) => {
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       generationConfig: { responseMimeType: "application/json" },
     });
 
