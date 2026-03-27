@@ -9,7 +9,11 @@ const saveWorker = new Worker(
     console.log(`[Worker] Picked up job ${job.id} for URL: ${job.data.url}`);
 
     // Call the Mongoose service we wrote in Phase 1
-    await processAndSaveUrl(job.data.url);
+    await processAndSaveUrl(
+      job.data.url,
+      job.data.saveReason,
+      job.data.userNote,
+    );
 
     console.log(`[Worker] Successfully processed job ${job.id}`);
   },

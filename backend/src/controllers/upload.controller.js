@@ -35,8 +35,9 @@ const handleFileUpload = async (req, res) => {
 
     // 1. Ask Gemini for the summary and tags
     const aiData = await generateSummaryAndTags(
-      content.substring(0, 100),
       content,
+      req.body.saveReason,
+      req.body.userNote,
     );
 
     // 2. Turn the summary into a Vector
@@ -51,6 +52,8 @@ const handleFileUpload = async (req, res) => {
       tags: aiData.tags,
       embedding: embedding,
       itemType: itemType,
+      saveReason: req.body.saveReason,
+      userNote: req.body.userNote,
     });
 
     await newItem.save();

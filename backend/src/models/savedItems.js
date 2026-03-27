@@ -35,6 +35,8 @@ const savedItemSchema = new mongoose.Schema(
       default: [],
     },
     linkedItems: [{ type: mongoose.Schema.Types.ObjectId, ref: "SavedItem" }],
+    userNote: { type: String, default: "" },
+    saveReason: { type: String, default: "General Reference" },
   },
   { timestamps: true }, // Automatically adds createdAt and updatedAt
 );

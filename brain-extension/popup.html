@@ -15,6 +15,30 @@
       </div>
 
       <div class="action-area">
+        <label class="input-label">Why are you saving this?</label>
+
+        <div class="reason-pills" id="reason-container">
+          <button class="pill active" data-reason="Read Later">
+            Read Later
+          </button>
+          <button class="pill" data-reason="YouTube Content">
+            YouTube Content
+          </button>
+          <button class="pill" data-reason="Hackathon Idea">
+            Hackathon Idea
+          </button>
+          <button class="pill" data-reason="Code Reference">
+            Code Reference
+          </button>
+        </div>
+
+        <textarea
+          id="user-note"
+          class="note-input"
+          placeholder="Add a custom note or thought (optional)..."
+          rows="2"
+        ></textarea>
+
         <button id="save-btn" class="btn-primary">
           <svg
             id="btn-icon"
@@ -39,7 +63,6 @@
 
         <p id="status-msg" class="status hidden"></p>
       </div>
-
       <div class="footer">
         <a href="http://localhost:3001" target="_blank" class="dashboard-link">
           Open Dashboard

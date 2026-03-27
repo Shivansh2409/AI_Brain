@@ -1,14 +1,14 @@
 const SavedItem = require("../models/savedItems");
 const { scrapeWebpage } = require("./scraper.service");
 const { scrapeYouTube } = require("./youtube.service");
-const { scrapePdf, fetchImageForGemini } = require("./media.service"); // <-- Import new service
+const { fetchImageForGemini } = require("./media.service"); // <-- Import new service
 const {
   generateSummaryAndTags,
   generateEmbedding,
   generateImageSummaryAndTags,
 } = require("./ai.service");
 
-const processAndSaveUrl = async (url) => {
+const processAndSaveUrl = async (url, saveReason, userNote) => {
   console.log(`[Pipeline] Starting process for: ${url}`);
 
   const existingItem = await SavedItem.findOne({ url });
@@ -34,16 +34,7 @@ const processAndSaveUrl = async (url) => {
     title = ytData.title;
     content = ytData.content;
     itemType = "youtube";
-    const aiData = await generateSummaryAndTags(content);
-    summary = aiData.summary;
-    tags = aiData.tags;
-  } else if (isPdf) {
-    console.log(`[Pipeline] Detected PDF Document...`);
-    const pdfData = await scrapePdf(url);
-    title = pdfData.title;
-    content = pdfData.content;
-    itemType = "pdf";
-    const aiData = await generateSummaryAndTags(content);
+    const aiData = await generateSummaryAndTags(content, saveReason, userNote);
     summary = aiData.summary;
     tags = aiData.tags;
   } else if (isImage) {
@@ -56,6 +47,8 @@ const processAndSaveUrl = async (url) => {
     const aiData = await generateImageSummaryAndTags(
       imgData.base64Image,
       imgData.mimeType,
+      saveReason,
+      userNote,
     );
     summary = aiData.summary;
     tags = aiData.tags;
@@ -65,7 +58,7 @@ const processAndSaveUrl = async (url) => {
     title = webData.title;
     content = webData.content;
     itemType = "article";
-    const aiData = await generateSummaryAndTags(content);
+    const aiData = await generateSummaryAndTags(content, saveReason, userNote);
     summary = aiData.summary;
     tags = aiData.tags;
   }
@@ -82,6 +75,8 @@ const processAndSaveUrl = async (url) => {
     tags,
     embedding,
     itemType,
+    saveReason,
+    userNote,
   });
 
   console.log(`[Pipeline] ✅ Success! Item saved as: ${itemType}`);

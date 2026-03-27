@@ -249,6 +249,17 @@ export default function Dashboard() {
                     🔗 Connect
                   </button>
                 </div>
+
+                <div className="mb-3 flex flex-col gap-2">
+                  <span className="self-start text-[10px] font-bold uppercase tracking-wider bg-blue-900/50 text-blue-300 px-2 py-1 rounded border border-blue-800/50">
+                    {item.saveReason}
+                  </span>
+                  {item.userNote && (
+                    <div className="bg-slate-900/50 border-l-2 border-blue-500 p-2 text-sm italic text-slate-300 line-clamp-2">
+                      "{item.userNote}"
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>

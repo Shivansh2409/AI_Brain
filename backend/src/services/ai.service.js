@@ -5,7 +5,7 @@ require("dotenv").config();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 1. Generate Summary and Tags using Gemini 1.5 Flash
-const generateSummaryAndTags = async (text) => {
+const generateSummaryAndTags = async (text, saveReason, userNote) => {
   if (!text || text.length < 50)
     return { summary: "Too short to summarize.", tags: [] };
 
@@ -17,13 +17,25 @@ const generateSummaryAndTags = async (text) => {
       },
     });
 
+    const userContext = `
+    The user explicitly saved this document for the following reason: "${saveReason || "General Reference"}".
+    ${userNote ? `The user also left this specific note: "${userNote}".` : ""}
+    
+    CRITICAL INSTRUCTION: Tailor your summary to focus heavily on the user's reason and note. Extract the key points that are most relevant to their specific goal.
+  `;
+
     const prompt = `
-      Analyze the following text. 
+      You are an expert research assistant. 
+   
+    
+      Analyze the following text and user context. 
       1. Provide a 2-sentence summary.
       2. Provide exactly 15 to 20 highly specific relevant tags/keywords. I am going to use these tax and keywords for showing the edges in the graph so make it clear and consistent
       Respond strictly with a JSON object using this exact schema: { "summary": "string", "tags": ["string", "string"] }
       
       Text: ${text}
+
+      user context:${userContext}
     `;
 
     const result = await model.generateContent(prompt);
