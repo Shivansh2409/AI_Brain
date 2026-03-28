@@ -1,24 +1,43 @@
-// 1. Handle Pill Selection
+// Get JWT from extension storage
+async function getOrFetchToken() {
+  return new Promise((resolve, reject) => {
+    // Get JWT from extension local storage
+    chrome.storage.local.get(["jwtToken"], (result) => {
+      if (result.jwtToken) {
+        resolve(result.jwtToken);
+      } else {
+        reject("Please log in at the dashboard first!");
+      }
+    });
+  });
+}
+
+// Helper function to show status messages
+function showStatus(message, type = "info") {
+  const statusMsg = document.getElementById("status-msg");
+  statusMsg.textContent = message;
+  statusMsg.className = `status ${type}`;
+}
+
+// Handle Pill Selection
 let selectedReason = "Read Later";
 document.querySelectorAll(".pill").forEach((pill) => {
   pill.addEventListener("click", (e) => {
-    // Remove active class from all pills
     document
       .querySelectorAll(".pill")
       .forEach((p) => p.classList.remove("active"));
-    // Add active class to clicked pill
     e.target.classList.add("active");
     selectedReason = e.target.getAttribute("data-reason");
   });
 });
 
+// Handle Save Button Click
 document.getElementById("save-btn").addEventListener("click", async () => {
   const btn = document.getElementById("save-btn");
   const btnText = document.getElementById("btn-text");
   const btnIcon = document.getElementById("btn-icon");
   const statusMsg = document.getElementById("status-msg");
 
-  // 2. Grab the custom note
   const userNote = document.getElementById("user-note").value.trim();
 
   btn.classList.add("loading");
@@ -26,6 +45,8 @@ document.getElementById("save-btn").addEventListener("click", async () => {
   statusMsg.className = "status hidden";
 
   try {
+    // Get JWT token - if not found, user needs to log in on dashboard
+    const jwtToken = await getOrFetchToken();
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = tab.url;
     let response;
@@ -39,8 +60,6 @@ document.getElementById("save-btn").addEventListener("click", async () => {
       const pdfBlob = await pdfResponse.blob();
       const formData = new FormData();
       formData.append("file", pdfBlob, "document.pdf");
-
-      // Append our new data to the form
       formData.append("saveReason", selectedReason);
       formData.append("userNote", userNote);
       formData.append("url", url);
@@ -48,6 +67,9 @@ document.getElementById("save-btn").addEventListener("click", async () => {
       btnText.innerText = "Sending to AI Brain...";
       response = await fetch("http://localhost:3000/api/upload", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+        },
         body: formData,
       });
     } else {
@@ -55,22 +77,50 @@ document.getElementById("save-btn").addEventListener("click", async () => {
       btnText.innerText = "Analyzing Page...";
       response = await fetch("http://localhost:3000/api/save", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Add the new fields here!
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwtToken}`,
+        },
         body: JSON.stringify({ url, saveReason: selectedReason, userNote }),
       });
     }
 
-    if (!response.ok) throw new Error("Server rejected the request");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Server rejected the request");
+    }
 
     btn.classList.remove("loading");
     btn.classList.add("success");
     btnText.innerText = "Saved to Brain!";
+    showStatus("✅ Successfully saved!", "success");
     setTimeout(() => window.close(), 2000);
   } catch (error) {
     console.error(error);
     btn.classList.remove("loading");
     btnText.innerText = "Try Again";
     btnIcon.style.display = "block";
+
+    if (error.message.includes("Please log in")) {
+      showStatus(
+        "❌ Not logged in! Open the dashboard and log in first.",
+        "error",
+      );
+    } else {
+      showStatus(`❌ Error: ${error.message}`, "error");
+    }
   }
+});
+
+// On page load, check if user is authenticated
+document.addEventListener("DOMContentLoaded", () => {
+  // Check if JWT exists
+  chrome.storage.local.get(["jwtToken"], (result) => {
+    if (!result.jwtToken) {
+      const btn = document.getElementById("save-btn");
+      btn.disabled = true;
+      btn.style.opacity = "0.5";
+      showStatus("⚠️ You must log in on the dashboard first!", "warning");
+    }
+  });
 });

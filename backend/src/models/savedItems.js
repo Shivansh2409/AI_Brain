@@ -37,6 +37,11 @@ const savedItemSchema = new mongoose.Schema(
     linkedItems: [{ type: mongoose.Schema.Types.ObjectId, ref: "SavedItem" }],
     userNote: { type: String, default: "" },
     saveReason: { type: String, default: "General Reference" },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true, // Now, no item can exist without an owner!
+    },
   },
   { timestamps: true }, // Automatically adds createdAt and updatedAt
 );

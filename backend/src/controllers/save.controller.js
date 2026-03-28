@@ -11,7 +11,7 @@ const saveItemController = async (req, res) => {
     // Push to the BullMQ queue
     await saveUrlQueue.add(
       "process-url",
-      { url, saveReason, userNote },
+      { url, saveReason, userNote, userId: req.user.id },
       {
         attempts: 3, // Automatically retry 3 times if Puppeteer or Gemini fails!
         backoff: { type: "exponential", delay: 5000 }, // Wait 5s, 10s, 20s between retries

@@ -10,7 +10,7 @@ const {
   generateImageSummaryAndTags,
 } = require("./ai.service");
 
-const processAndSaveUrl = async (url, saveReason, userNote) => {
+const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
   console.log(`[Pipeline] Starting process for: ${url}`);
 
   const existingItem = await SavedItem.findOne({ url });
@@ -79,6 +79,7 @@ const processAndSaveUrl = async (url, saveReason, userNote) => {
     itemType,
     saveReason,
     userNote,
+    userId,
   });
 
   console.log(`[Pipeline] ✅ Success! Item saved as: ${itemType}`);

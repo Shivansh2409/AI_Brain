@@ -7,6 +7,7 @@ const searchRoutes = require("./routes/search.routes");
 const feedRoutes = require("./routes/feed.routes");
 const linkRoutes = require("./routes/link.routes");
 const uploadRoutes = require("./routes/upload.routes");
+const authRoutes = require("./routes/auth.routes");
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api", searchRoutes);
 app.use("/api", feedRoutes);
 app.use("/api", linkRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api", authRoutes);
 
 app.get("/health", (req, res) => {
   console.log("Health check hit!");

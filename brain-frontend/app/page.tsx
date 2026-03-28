@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Brain,
@@ -10,16 +11,34 @@ import {
   Image as ImageIcon,
   File as FileIcon,
   LayoutGrid,
+  LogOut,
 } from "lucide-react";
 import KnowledgeGraph from "./components/KnowledgeGraph";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'graph'
   const [activeCategory, setActiveCategory] = useState("all"); // Tracks the current tab
   const [linkingSource, setLinkingSource] = useState<any>(null); // The item you clicked "Link" on
+  const [user, setUser] = useState<any>(null);
+
+  // Check JWT token on mount
+  useEffect(() => {
+    const token = localStorage.getItem("jwtToken");
+    const userData = localStorage.getItem("user");
+
+    if (!token) {
+      router.push("/auth/login");
+      return;
+    }
+
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, [router]);
 
   // 1. Fetch data whenever the active category changes
   useEffect(() => {
@@ -31,8 +50,12 @@ export default function Dashboard() {
 
   const fetchFeed = async (category: string) => {
     try {
+      const token = localStorage.getItem("jwtToken");
       const res = await fetch(
         `http://localhost:3000/api/feed?type=${category}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
       const data = await res.json();
       setItems(data);
@@ -52,8 +75,12 @@ export default function Dashboard() {
     setIsSearching(true);
     // Note: Search searches ALL items by meaning, ignoring the category tab for broader discovery
     try {
+      const token = localStorage.getItem("jwtToken");
       const res = await fetch(
         `http://localhost:3000/api/search?q=${encodeURIComponent(searchQuery)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
       const responseData = await res.json();
       setItems(responseData.data);
@@ -70,6 +97,13 @@ export default function Dashboard() {
     setActiveCategory(category);
   };
 
+  // 4. Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem("jwtToken");
+    localStorage.removeItem("user");
+    router.push("/auth/login");
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-8 font-sans">
       <div className="max-w-5xl mx-auto mb-8">
@@ -80,19 +114,39 @@ export default function Dashboard() {
             AI Second Brain
           </h1>
 
-          <div className="flex bg-slate-800 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`px-4 py-2 rounded-md transition ${viewMode === "grid" ? "bg-blue-600" : "hover:bg-slate-700"}`}
-            >
-              Feed
-            </button>
-            <button
-              onClick={() => setViewMode("graph")}
-              className={`px-4 py-2 rounded-md transition ${viewMode === "graph" ? "bg-blue-600" : "hover:bg-slate-700"}`}
-            >
-              Graph View
-            </button>
+          <div className="flex items-center gap-4">
+            {/* User Info & Logout */}
+            {user && (
+              <div className="flex items-center gap-4">
+                <div className="text-sm">
+                  <p className="text-slate-300">{user.name}</p>
+                  <p className="text-slate-500 text-xs">{user.email}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-red-600/20 rounded-lg transition text-red-400 hover:text-red-300"
+                  title="Logout"
+                >
+                  <LogOut size={20} />
+                </button>
+              </div>
+            )}
+
+            {/* View Mode Buttons */}
+            <div className="flex bg-slate-800 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`px-4 py-2 rounded-md transition ${viewMode === "grid" ? "bg-blue-600" : "hover:bg-slate-700"}`}
+              >
+                Feed
+              </button>
+              <button
+                onClick={() => setViewMode("graph")}
+                className={`px-4 py-2 rounded-md transition ${viewMode === "graph" ? "bg-blue-600" : "hover:bg-slate-700"}`}
+              >
+                Graph View
+              </button>
+            </div>
           </div>
         </div>
 

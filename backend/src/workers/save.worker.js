@@ -20,6 +20,7 @@ const saveWorker = new Worker(
       saveReason,
       userNote,
       url,
+      userId,
     } = job.data;
 
     // ==========================================
@@ -61,7 +62,7 @@ const saveWorker = new Worker(
       console.log(`[Worker] Picked up job ${job.id} for URL: ${url}`);
 
       // Call the Mongoose service we wrote in Phase 1
-      await processAndSaveUrl(url, saveReason, userNote);
+      await processAndSaveUrl(url, saveReason, userNote, userId);
 
       console.log(`[Worker] Successfully processed URL job ${job.id}`);
     }
