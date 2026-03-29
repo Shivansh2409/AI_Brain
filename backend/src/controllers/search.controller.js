@@ -8,7 +8,7 @@ const searchItemsController = async (req, res) => {
       return res.status(400).json({ error: "Search query (q) is required" });
     }
 
-    const results = await semanticSearch(q);
+    const results = await semanticSearch(q, req.user.id); // Pass the logged-in user's ID to only search their items
 
     return res.status(200).json({
       message: "Search successful",

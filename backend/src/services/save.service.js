@@ -20,12 +20,16 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
   const lowerUrl = url.toLowerCase();
   const isYouTube =
     lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be");
-  const isPdf = lowerUrl.endsWith(".pdf");
+
   const isImage =
-    lowerUrl.endsWith(".png") ||
-    lowerUrl.endsWith(".jpg") ||
-    lowerUrl.endsWith(".jpeg") ||
-    lowerUrl.endsWith(".webp");
+    // Check A: Does it have a standard extension? (Handles regular URLs like .png?v=123)
+    /\.(jpeg|jpg|gif|png|webp|avif|svg|bmp)(\?.*|#.*)?$/i.test(lowerUrl) ||
+    // Check B: Is it coming from a known Image Proxy / CDN? (Handles your Brave URL)
+    /imgs\.search\.brave\.com|images\.unsplash\.com|source\.unsplash\.com|i\.imgur\.com/i.test(
+      lowerUrl,
+    ) ||
+    // Check C: Does the URL path explicitly say it is an image API?
+    /\/image\/|\/img\//i.test(lowerUrl);
 
   let title, content, itemType;
   let summary, tags;

@@ -12,7 +12,6 @@ const getFeedController = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50)
       .select("-embedding");
-    console.log(feedItems);
     return res.status(200).json(feedItems);
   } catch (error) {
     console.error("Error fetching feed:", error);
