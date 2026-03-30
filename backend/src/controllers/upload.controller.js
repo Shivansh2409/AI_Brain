@@ -21,6 +21,7 @@ const handleFileUpload = async (req, res) => {
         saveReason: saveReason || "General Reference",
         userNote: userNote || "",
         url: url,
+        userId: req.user.id, // Pass the logged-in user's ID so the worker can associate the file with the correct user
       },
       {
         attempts: 3, // Automatically retry 3 times if parsing or Gemini fails!

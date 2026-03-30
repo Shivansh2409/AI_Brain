@@ -97,6 +97,7 @@ const processAndSaveFile = async (
   saveReason,
   userNote,
   url,
+  userId,
 ) => {
   console.log(
     `[Save Service] Starting AI processing for local file: ${originalName}`,
@@ -158,6 +159,7 @@ const processAndSaveFile = async (
       itemType: itemType,
       saveReason: saveReason || "General Reference",
       userNote: userNote || "",
+      userId: userId,
     });
 
     await newItem.save();

@@ -6,8 +6,12 @@
   "action": {
     "default_popup": "popup.html"
   },
-  "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["http://localhost:3000/*"],
+  "permissions": ["activeTab", "scripting", "storage", "identity"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "*://*.googleusercontent.com/*",
+    "*://drive.google.com/*"
+  ],
   "content_scripts": [
     {
       "matches": ["http://localhost:3001/*"],

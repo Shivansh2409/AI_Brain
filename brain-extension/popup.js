@@ -54,12 +54,28 @@ document.getElementById("save-btn").addEventListener("click", async () => {
     if (url.toLowerCase().endsWith(".pdf") || url.includes("/pdf/")) {
       // PDF Payload
       btnText.innerText = "Bypassing firewall...";
-      const pdfResponse = await fetch(url, { method: "GET" });
-      if (!pdfResponse.ok) throw new Error("Could not download PDF");
+      let pdfUrlToFetch = url;
+      if (url.includes("drive.google.com/file/d/")) {
+        // Extract the File ID
+        const match = url.match(/\/d\/(.*?)\//);
+        if (match && match[1]) {
+          const fileId = match[1];
+          // Convert to direct download link
+          pdfUrlToFetch = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        }
+      }
+      const pdfFetchParams = { method: "GET" };
+      const pdfResponse = await fetch(url, pdfFetchParams);
 
+      console.log(pdfResponse.ok);
+      if (!pdfResponse.ok) throw new Error("Could not download PDF from tab.");
       const pdfBlob = await pdfResponse.blob();
       const formData = new FormData();
-      formData.append("file", pdfBlob, "document.pdf");
+
+      const fileName = "document.pdf";
+      console.log(`Fetched PDF: ${fileName} (${pdfBlob.size} bytes)`);
+      formData.append("file", pdfBlob, fileName);
+
       formData.append("saveReason", selectedReason);
       formData.append("userNote", userNote);
       formData.append("url", url);

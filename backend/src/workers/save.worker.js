@@ -38,6 +38,7 @@ const saveWorker = new Worker(
           saveReason,
           userNote,
           url,
+          userId,
         );
         console.log(`[Worker] Successfully processed file job ${job.id}`);
       } finally {
