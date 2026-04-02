@@ -14,32 +14,33 @@ const semanticSearch = async (userQuery, userId) => {
   console.log(`[Search] Query embedded. Searching MongoDB...`);
 
   // 2. Use MongoDB's $vectorSearch aggregation to find the closest matches
-  const results = await SavedItem.aggregate(
-    [
-      {
-        $vectorSearch: {
-          index: "vector_index", // The name of the index we just made in Atlas
-          path: "embedding", // The field in our schema holding the arrays
-          queryVector: queryVector,
-          numCandidates: 50, // How many items to analyze
-          limit: 5, // How many top results to return
-        },
+  const results = await SavedItem.aggregate([
+    {
+      $match: {
+        userId: userId, // Filter by userId first
       },
-      {
-        // 3. Clean up the output so we don't send massive arrays to the frontend
-        $project: {
-          _id: 1,
-          title: 1,
-          url: 1,
-          summary: 1,
-          tags: 1,
-          itemType: 1,
-          score: { $meta: "vectorSearchScore" }, // Shows us how confident the AI is (0 to 1)
-        },
+    },
+    {
+      $vectorSearch: {
+        index: "vector_index",
+        path: "embedding",
+        queryVector: queryVector,
+        numCandidates: 50,
+        limit: 5,
       },
-    ],
-    { userId: userId },
-  ); // 4. Filter results to only include items from the logged-in user
+    },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        url: 1,
+        summary: 1,
+        tags: 1,
+        itemType: 1,
+        score: { $meta: "vectorSearchScore" },
+      },
+    },
+  ]);
 
   return results;
 };
