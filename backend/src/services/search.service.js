@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const SavedItem = require("../models/savedItems");
 const { generateEmbedding } = require("./ai.service");
 
@@ -15,11 +16,11 @@ const semanticSearch = async (userQuery, userId) => {
 
   // 2. Use MongoDB's $vectorSearch aggregation to find the closest matches
   const results = await SavedItem.aggregate([
-    {
-      $match: {
-        userId: userId, // Filter by userId first
-      },
-    },
+    // {
+    //   $match: {
+    //     userId: userId, // Filter by userId first
+    //   },
+    // },
     {
       $vectorSearch: {
         index: "vector_index",
@@ -27,6 +28,9 @@ const semanticSearch = async (userQuery, userId) => {
         queryVector: queryVector,
         numCandidates: 50,
         limit: 5,
+        filter: {
+          userId: new mongoose.Types.ObjectId(userId),
+        },
       },
     },
     {
