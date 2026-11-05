@@ -1,13 +1,33 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 
+// Emails are compared case-insensitively by storing them lowercased.
+const normalizeEmail = (email) => email.trim().toLowerCase();
+
+// Only accept plain strings. This also blocks query-operator injection such as
+// { "email": { "$ne": null } } reaching User.findOne().
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.trim().length > 0;
+
+const signToken = (user) =>
+  jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
+
 // Register Controller
 const register = async (req, res) => {
   try {
     const { name, email, password, confirmPassword } = req.body;
 
     // Validation
-    if (!name || !email || !password || !confirmPassword) {
+    if (
+      !isNonEmptyString(name) ||
+      !isNonEmptyString(email) ||
+      typeof password !== "string" ||
+      typeof confirmPassword !== "string" ||
+      !password ||
+      !confirmPassword
+    ) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
@@ -21,27 +41,30 @@ const register = async (req, res) => {
         .json({ error: "Password must be at least 6 characters" });
     }
 
+    const normalizedEmail = normalizeEmail(email);
+
     // Check if user already exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: normalizedEmail });
     if (user) {
       return res.status(400).json({ error: "User already exists" });
     }
 
     // Create new user
-    user = await User.create({ name, email, password });
-
-    // Generate JWT
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" },
-    );
+    user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password,
+    });
 
     res.status(201).json({
-      token,
+      token: signToken(user),
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (error) {
+    // Two simultaneous sign-ups with the same email: the unique index catches it
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "User already exists" });
+    }
     console.error(error);
     res.status(500).json({ error: "Registration failed" });
   }
@@ -53,12 +76,12 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     // Validation
-    if (!email || !password) {
+    if (!isNonEmptyString(email) || typeof password !== "string" || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
     // Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizeEmail(email) });
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -69,15 +92,8 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate JWT
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" },
-    );
-
     res.status(200).json({
-      token,
+      token: signToken(user),
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (error) {

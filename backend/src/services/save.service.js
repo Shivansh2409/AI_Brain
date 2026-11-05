@@ -13,7 +13,8 @@ const {
 const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
   console.log(`[Pipeline] Starting process for: ${url}`);
 
-  const existingItem = await SavedItem.findOne({ url });
+  // Dedupe per user: another user having saved this URL doesn't count.
+  const existingItem = await SavedItem.findOne({ url, userId });
   if (existingItem) return existingItem;
 
   // 1. DETECT CONTENT TYPE BY URL EXTENSION
@@ -102,7 +103,8 @@ const processAndSaveFile = async (
   console.log(
     `[Save Service] Starting AI processing for local file: ${originalName}`,
   );
-  const existingItem = await SavedItem.findOne({ url });
+  // Dedupe per user (the upload controller always provides a url)
+  const existingItem = await SavedItem.findOne({ url, userId });
   if (existingItem) return existingItem;
   let content = "";
   let itemType = "file";
@@ -117,13 +119,15 @@ const processAndSaveFile = async (
 
       // Parse it using the V2 pdf-parse class
       const parser = new PDFParse({ data: fileBuffer });
-      const textResult = await parser.getText();
+      try {
+        const textResult = await parser.getText();
 
-      // Extract and trim the text to ensure it fits safely inside Gemini's context window
-      content = textResult.text.substring(0, 15000);
-
-      // CRITICAL: Prevent memory leaks by destroying the V2 parser
-      await parser.destroy();
+        // Extract and trim the text to ensure it fits safely inside Gemini's context window
+        content = textResult.text.substring(0, 15000);
+      } finally {
+        // CRITICAL: Prevent memory leaks by destroying the V2 parser, even on a bad PDF
+        await parser.destroy();
+      }
     } else {
       throw new Error(
         `Unsupported file type: ${mimetype}. Only PDFs are currently supported.`,

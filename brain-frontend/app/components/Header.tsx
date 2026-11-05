@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Brain, LogOut, Grid, Zap } from "lucide-react";
+import { clearSession } from "../lib/api";
 
 interface HeaderProps {
   user: { name: string; email: string } | null;
@@ -17,9 +18,8 @@ export default function Header({
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem("jwtToken");
-    localStorage.removeItem("user");
-    router.push("/auth/login");
+    clearSession();
+    router.replace("/auth/login");
   };
 
   return (

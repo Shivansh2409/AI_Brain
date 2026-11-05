@@ -1,23 +1,45 @@
 // src/controllers/link.controller.js
+const mongoose = require("mongoose");
 const SavedItem = require("../models/savedItems");
+
+// Validates both IDs and checks that the logged-in user owns both items.
+// Returns an error response object, or null when the request is OK.
+const checkLinkRequest = async (req) => {
+  const { sourceId, targetId } = req.body;
+  const isId = (id) =>
+    typeof id === "string" && mongoose.Types.ObjectId.isValid(id);
+
+  if (!isId(sourceId) || !isId(targetId) || sourceId === targetId) {
+    return { status: 400, error: "Invalid item IDs provided." };
+  }
+
+  const owned = await SavedItem.countDocuments({
+    _id: { $in: [sourceId, targetId] },
+    userId: req.user.id,
+  });
+  if (owned !== 2) {
+    return { status: 404, error: "Item not found." };
+  }
+  return null;
+};
 
 const manuallyLinkItems = async (req, res) => {
   try {
+    const problem = await checkLinkRequest(req);
+    if (problem) {
+      return res.status(problem.status).json({ error: problem.error });
+    }
     const { sourceId, targetId } = req.body;
 
-    if (!sourceId || !targetId || sourceId === targetId) {
-      return res.status(400).json({ error: "Invalid item IDs provided." });
-    }
-
-    // 1. Update the Source Item to include the Target
-    await SavedItem.findByIdAndUpdate(sourceId, {
-      $addToSet: { linkedItems: targetId }, // $addToSet prevents duplicate links
-    });
-
-    // 2. Update the Target Item to include the Source
-    await SavedItem.findByIdAndUpdate(targetId, {
-      $addToSet: { linkedItems: sourceId },
-    });
+    // $addToSet prevents duplicate links; update both sides of the link
+    await SavedItem.updateOne(
+      { _id: sourceId, userId: req.user.id },
+      { $addToSet: { linkedItems: targetId } },
+    );
+    await SavedItem.updateOne(
+      { _id: targetId, userId: req.user.id },
+      { $addToSet: { linkedItems: sourceId } },
+    );
 
     console.log(`[Linker] 🔗 Manually linked ${sourceId} to ${targetId}`);
     return res
@@ -28,23 +50,24 @@ const manuallyLinkItems = async (req, res) => {
     return res.status(500).json({ error: "Failed to link items" });
   }
 };
+
 const manuallyUnlinkItems = async (req, res) => {
   try {
+    const problem = await checkLinkRequest(req);
+    if (problem) {
+      return res.status(problem.status).json({ error: problem.error });
+    }
     const { sourceId, targetId } = req.body;
 
-    if (!sourceId || !targetId || sourceId === targetId) {
-      return res.status(400).json({ error: "Invalid item IDs provided." });
-    }
-
-    // 1. $pull removes the targetId from the source's linkedItems array
-    await SavedItem.findByIdAndUpdate(sourceId, {
-      $pull: { linkedItems: targetId },
-    });
-
-    // 2. Do the exact same thing in reverse for the target item
-    await SavedItem.findByIdAndUpdate(targetId, {
-      $pull: { linkedItems: sourceId },
-    });
+    // $pull removes the link from both sides
+    await SavedItem.updateOne(
+      { _id: sourceId, userId: req.user.id },
+      { $pull: { linkedItems: targetId } },
+    );
+    await SavedItem.updateOne(
+      { _id: targetId, userId: req.user.id },
+      { $pull: { linkedItems: sourceId } },
+    );
 
     console.log(`[Linker] ✂️ Manually unlinked ${sourceId} from ${targetId}`);
     return res
@@ -55,4 +78,5 @@ const manuallyUnlinkItems = async (req, res) => {
     return res.status(500).json({ error: "Failed to unlink items" });
   }
 };
+
 module.exports = { manuallyLinkItems, manuallyUnlinkItems };

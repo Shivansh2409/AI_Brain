@@ -3,22 +3,26 @@ const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    name: { type: String, required: true, trim: true },
+    // Stored lowercased so "A@x.com" and "a@x.com" are the same account.
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     password: { type: String, required: true },
   },
   { timestamps: true },
 );
 
-// Hash password before saving
+// Hash password before saving. If hashing fails the error propagates and the
+// save is aborted — never store the plain-text password.
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-  } catch (error) {
-    console.error("Error hashing password:", error);
-  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Method to compare passwords

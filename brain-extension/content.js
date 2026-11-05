@@ -1,40 +1,37 @@
-// Content script - runs on http://localhost:3001/*
-// This script monitors localStorage for JWT changes and syncs them to the extension
+// Content script - runs on the dashboard (http://localhost:3000/*, or :3001 in dev)
+// Keeps the extension's copy of the JWT in sync with the dashboard's localStorage.
 
-// Initial check for JWT on page load
-window.addEventListener("load", () => {
+let lastSynced; // undefined until the first check, so the first check always syncs
+
+function syncToken() {
   const token = localStorage.getItem("jwtToken");
+  if (token === lastSynced) return;
+  lastSynced = token;
+
   if (token) {
-    chrome.runtime.sendMessage(
-      { type: "SYNC_JWT_TOKEN", token },
-      (response) => {
-        console.log("JWT synced to extension:", response);
-      },
-    );
+    chrome.runtime.sendMessage({ type: "SYNC_JWT_TOKEN", token }, (response) => {
+      console.log("JWT synced to extension:", response);
+    });
+  } else {
+    chrome.runtime.sendMessage({ type: "CLEAR_JWT_TOKEN" }, (response) => {
+      console.log("JWT cleared from extension:", response);
+    });
   }
-});
+}
 
-// Monitor localStorage changes
+// On page load
+syncToken();
+
+// Login/logout in another tab fires a "storage" event...
 window.addEventListener("storage", (event) => {
-  if (event.key === "jwtToken") {
-    if (event.newValue) {
-      // Token was added or updated
-      chrome.runtime.sendMessage(
-        { type: "SYNC_JWT_TOKEN", token: event.newValue },
-        (response) => {
-          console.log("JWT updated in extension:", response);
-        },
-      );
-    } else {
-      // Token was removed (logout)
-      chrome.runtime.sendMessage({ type: "CLEAR_JWT_TOKEN" }, (response) => {
-        console.log("JWT cleared from extension:", response);
-      });
-    }
-  }
+  if (event.key === "jwtToken") syncToken();
 });
 
-// Also listen for messages from the extension requesting the token
+// ...but login/logout in THIS tab doesn't (the dashboard navigates client-side,
+// so there's no page load either). A cheap periodic check covers that case.
+setInterval(syncToken, 1500);
+
+// Also answer direct requests for the token from the extension
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "REQUEST_JWT_TOKEN") {
     const token = localStorage.getItem("jwtToken");

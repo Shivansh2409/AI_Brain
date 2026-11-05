@@ -1,6 +1,8 @@
 "use client";
 
-import { API_BASE } from "../lib/api";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { authFetch, UnauthorizedError } from "../lib/api";
 
 interface LinkingModalProps {
   sourceItem: any;
@@ -17,47 +19,41 @@ export default function LinkingModal({
   onClose,
   onRefresh,
 }: LinkingModalProps) {
-  const handleLink = async (targetId: string) => {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  // Link or unlink, and only close the modal if the server accepted it
+  const updateLink = async (action: "link" | "unlink", targetId: string) => {
+    setError(null);
+    setPendingId(targetId);
     try {
-      const token = localStorage.getItem("jwtToken");
-      await fetch(`${API_BASE}/api/link`, {
+      const res = await authFetch(`/api/${action}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          sourceId: sourceItem._id,
-          targetId: targetId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceId: sourceItem._id, targetId }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error || `Couldn't ${action} these items.`);
+        return;
+      }
       onClose();
       onRefresh();
-    } catch (error) {
-      console.error("Error linking items:", error);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        router.replace("/auth/login");
+        return;
+      }
+      console.error(`Error trying to ${action} items:`, err);
+      setError("Couldn't reach the server.");
+    } finally {
+      setPendingId(null);
     }
   };
 
-  const handleUnlink = async (targetId: string) => {
-    try {
-      const token = localStorage.getItem("jwtToken");
-      await fetch(`${API_BASE}/api/unlink`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          sourceId: sourceItem._id,
-          targetId: targetId,
-        }),
-      });
-      onClose();
-      onRefresh();
-    } catch (error) {
-      console.error("Error unlinking items:", error);
-    }
-  };
+  const handleLink = (targetId: string) => updateLink("link", targetId);
+  const handleUnlink = (targetId: string) => updateLink("unlink", targetId);
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -70,6 +66,11 @@ export default function LinkingModal({
           <p className="text-sm text-slate-400">
             Link this item to others in your knowledge graph
           </p>
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-red-400">
+              {error}
+            </p>
+          )}
         </div>
 
         {/* Content */}
@@ -96,14 +97,16 @@ export default function LinkingModal({
                   {isLinked ? (
                     <button
                       onClick={() => handleUnlink(targetItem._id)}
-                      className="shrink-0 px-4 py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-600/50 hover:border-red-400 rounded-lg text-sm font-medium transition duration-300 shadow-lg hover:shadow-red-500/50"
+                      disabled={pendingId !== null}
+                      className="disabled:opacity-50 shrink-0 px-4 py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-600/50 hover:border-red-400 rounded-lg text-sm font-medium transition duration-300 shadow-lg hover:shadow-red-500/50"
                     >
                       Unlink
                     </button>
                   ) : (
                     <button
                       onClick={() => handleLink(targetItem._id)}
-                      className="shrink-0 px-4 py-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-600/50 hover:border-blue-400 rounded-lg text-sm font-medium transition duration-300 shadow-lg hover:shadow-blue-500/50"
+                      disabled={pendingId !== null}
+                      className="disabled:opacity-50 shrink-0 px-4 py-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-600/50 hover:border-blue-400 rounded-lg text-sm font-medium transition duration-300 shadow-lg hover:shadow-blue-500/50"
                     >
                       Link
                     </button>

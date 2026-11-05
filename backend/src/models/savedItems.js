@@ -2,10 +2,11 @@ const mongoose = require("mongoose");
 
 const savedItemSchema = new mongoose.Schema(
   {
+    // Unique per user (see the compound index below), not globally:
+    // two users can save the same link.
     url: {
       type: String,
       required: true,
-      unique: true,
     },
     title: {
       type: String,
@@ -45,5 +46,8 @@ const savedItemSchema = new mongoose.Schema(
   },
   { timestamps: true }, // Automatically adds createdAt and updatedAt
 );
+
+// Each user can save a given URL once. Also serves the per-user feed lookups.
+savedItemSchema.index({ userId: 1, url: 1 }, { unique: true });
 
 module.exports = mongoose.model("SavedItem", savedItemSchema);

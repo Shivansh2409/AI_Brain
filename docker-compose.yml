@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    image: ai_brain-app
     ports:
       - "3000:3000"
     env_file:
@@ -9,14 +10,30 @@ services:
       PORT: 3000
       REDIS_URL: redis://redis:6379
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    # Chromium uses /dev/shm heavily; Docker's 64MB default makes tabs crash.
+    shm_size: "512mb"
     restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
+    # AOF so queued save jobs survive a restart; noeviction is what BullMQ requires.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
+    logging: *logging
 
 volumes:
   redis-data:

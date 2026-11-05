@@ -40,8 +40,8 @@ export default function LoginPage() {
       localStorage.setItem("jwtToken", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // Redirect to dashboard
-      router.push("/");
+      // Redirect to dashboard (replace: Back shouldn't return to the login form)
+      router.replace("/");
     } catch (err) {
       console.error(err);
       setError("An error occurred. Please try again.");

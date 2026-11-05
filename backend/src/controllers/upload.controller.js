@@ -8,7 +8,19 @@ const handleFileUpload = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const { saveReason, userNote, url } = req.body;
+    const { saveReason, userNote } = req.body;
+
+    // The item's title comes from the client's file name; keep it to a sane length.
+    const originalName =
+      String(req.file.originalname || "document.pdf").slice(0, 200) ||
+      "document.pdf";
+
+    // url is required on saved items and used to dedupe; give direct uploads
+    // (no source page) a unique placeholder instead of leaving it empty.
+    const url =
+      typeof req.body.url === "string" && req.body.url.trim()
+        ? req.body.url.trim()
+        : `upload://${req.file.filename}`;
 
     // Push to the BullMQ queue
     await saveUrlQueue.add(
@@ -16,11 +28,11 @@ const handleFileUpload = async (req, res) => {
       {
         type: "file", // We pass this flag so the worker knows to use the File logic
         filePath: req.file.path,
-        originalName: req.file.originalname,
+        originalName,
         mimetype: req.file.mimetype,
         saveReason: saveReason || "General Reference",
         userNote: userNote || "",
-        url: url,
+        url,
         userId: req.user.id, // Pass the logged-in user's ID so the worker can associate the file with the correct user
       },
       {

@@ -1,8 +1,8 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { API_BASE } from "./lib/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { authFetch, UnauthorizedError } from "./lib/api";
 import { useRouter } from "next/navigation";
 import ProtectedLayout from "./components/ProtectedLayout";
 import Header from "./components/Header";
@@ -14,7 +14,8 @@ import KnowledgeGraph from "./components/KnowledgeGraph";
 
 export default function Dashboard() {
   const router = useRouter();
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "graph">("grid");
@@ -22,71 +23,87 @@ export default function Dashboard() {
   const [linkingSource, setLinkingSource] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
 
-  // Check JWT token on mount
+  // Every feed/search request gets an id; only the newest one may update the
+  // page, so a slow older response can't overwrite newer results.
+  const latestRequest = useRef(0);
+
+  // Load the user's name/email for the header (ProtectedLayout handles redirects)
   useEffect(() => {
-    const token = localStorage.getItem("jwtToken");
-    const userData = localStorage.getItem("user");
-
-    if (!token) {
-      router.push("/auth/login");
-      return;
+    try {
+      const userData = localStorage.getItem("user");
+      if (userData) setUser(JSON.parse(userData));
+    } catch {
+      localStorage.removeItem("user"); // corrupted value; header just hides
     }
+  }, []);
 
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-  }, [router]);
+  const loadItems = useCallback(
+    async (path: string, pickList: (body: any) => unknown) => {
+      const requestId = ++latestRequest.current;
+      const isCurrent = () => requestId === latestRequest.current;
+      setError(null);
+
+      try {
+        const res = await authFetch(path);
+        const body = await res.json().catch(() => null);
+        if (!isCurrent()) return;
+
+        if (!res.ok) {
+          setItems([]);
+          setError(body?.error || `Request failed (${res.status})`);
+          return;
+        }
+        const list = pickList(body);
+        setItems(Array.isArray(list) ? list : []);
+      } catch (err) {
+        if (!isCurrent()) return;
+        if (err instanceof UnauthorizedError) {
+          router.replace("/auth/login");
+          return;
+        }
+        console.error("Request failed:", err);
+        setItems([]);
+        setError("Couldn't reach the server. Check that it's running.");
+      } finally {
+        if (isCurrent()) setIsSearching(false);
+      }
+    },
+    [router],
+  );
+
+  const fetchFeed = useCallback(
+    (category: string) =>
+      loadItems(
+        `/api/feed?type=${encodeURIComponent(category)}`,
+        (b: any) => b,
+      ),
+    [loadItems],
+  );
 
   // Fetch data whenever the active category changes
+  // (switchCategory clears the search, so the feed is always what's wanted)
   useEffect(() => {
-    if (!searchQuery) {
-      fetchFeed(activeCategory);
-    }
-  }, [activeCategory]);
-
-  const fetchFeed = async (category: string) => {
-    try {
-      const token = localStorage.getItem("jwtToken");
-      const res = await fetch(
-        `${API_BASE}/api/feed?type=${category}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const data = await res.json();
-      setItems(data);
-    } catch (error) {
-      console.error("Failed to fetch feed:", error);
-    }
-  };
+    fetchFeed(activeCategory);
+  }, [activeCategory, fetchFeed]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) {
+    const query = searchQuery.trim();
+    if (!query) {
       fetchFeed(activeCategory);
       return;
     }
 
     setIsSearching(true);
-    try {
-      const token = localStorage.getItem("jwtToken");
-      const res = await fetch(
-        `${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const responseData = await res.json();
-      setItems(responseData.data);
-    } catch (error) {
-      console.error("Search failed:", error);
-    } finally {
-      setIsSearching(false);
-    }
+    await loadItems(
+      `/api/search?q=${encodeURIComponent(query)}`,
+      (b: any) => b?.data,
+    );
   };
 
   const switchCategory = (category: string) => {
     setSearchQuery("");
+    setIsSearching(false);
     setActiveCategory(category);
   };
 
@@ -118,7 +135,14 @@ export default function Dashboard() {
 
           {/* Content Area */}
           <div className="mt-10">
-            {viewMode === "grid" ? (
+            {error ? (
+              <div
+                role="alert"
+                className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm"
+              >
+                {error}
+              </div>
+            ) : viewMode === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <ItemGrid
                   items={items}

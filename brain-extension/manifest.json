@@ -10,11 +10,12 @@
   "host_permissions": [
     "http://localhost:3000/*",
     "*://*.googleusercontent.com/*",
-    "*://drive.google.com/*"
+    "*://drive.google.com/*",
+    "*://drive.usercontent.google.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["http://localhost:3001/*"],
+      "matches": ["http://localhost:3000/*", "http://localhost:3001/*"],
       "js": ["content.js"]
     }
   ],

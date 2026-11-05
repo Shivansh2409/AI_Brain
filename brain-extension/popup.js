@@ -6,7 +6,7 @@ async function getOrFetchToken() {
       if (result.jwtToken) {
         resolve(result.jwtToken);
       } else {
-        reject("Please log in at the dashboard first!");
+        reject(new Error("Please log in at the dashboard first!"));
       }
     });
   });
@@ -51,30 +51,51 @@ document.getElementById("save-btn").addEventListener("click", async () => {
     const url = tab.url;
     let response;
 
-    if (url.toLowerCase().endsWith(".pdf") || url.includes("/pdf/")) {
-      // PDF Payload
-      btnText.innerText = "Bypassing firewall...";
-      let pdfUrlToFetch = url;
-      if (url.includes("drive.google.com/file/d/")) {
-        // Extract the File ID
-        const match = url.match(/\/d\/(.*?)\//);
-        if (match && match[1]) {
-          const fileId = match[1];
-          // Convert to direct download link
-          pdfUrlToFetch = `https://drive.google.com/uc?export=download&id=${fileId}`;
-        }
-      }
-      const pdfFetchParams = { method: "GET" };
-      const pdfResponse = await fetch(url, pdfFetchParams);
+    // Google Drive file pages look like drive.google.com/file/d/<id>/view
+    const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/?#]+)/);
+    const pathname = new URL(url).pathname.toLowerCase();
+    const looksLikePdf =
+      pathname.endsWith(".pdf") || pathname.includes("/pdf/");
 
-      console.log(pdfResponse.ok);
+    if (driveMatch || looksLikePdf) {
+      // PDF Payload
+      btnText.innerText = "Downloading PDF...";
+
+      // Drive's viewer page is HTML; ask Drive for the file itself instead.
+      const pdfUrlToFetch = driveMatch
+        ? `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`
+        : url;
+
+      // credentials: "include" sends your Google cookies so private Drive files work
+      const pdfResponse = await fetch(pdfUrlToFetch, { credentials: "include" });
       if (!pdfResponse.ok) throw new Error("Could not download PDF from tab.");
       const pdfBlob = await pdfResponse.blob();
-      const formData = new FormData();
 
-      const fileName = "document.pdf";
+      // Make sure we actually got a PDF (Drive returns an HTML page for
+      // non-PDF files, files you can't access, or its virus-scan warning).
+      const header = await pdfBlob.slice(0, 5).text();
+      if (header !== "%PDF-") {
+        throw new Error(
+          driveMatch
+            ? "Drive didn't return a PDF. Only PDF files you can access are supported (very large files need to be downloaded manually)."
+            : "This page didn't return a PDF file.",
+        );
+      }
+
+      // Use a real name for the item title instead of "document.pdf"
+      let fileName = driveMatch
+        ? (tab.title || "").replace(/\s+-\s+Google Drive$/, "")
+        : decodeURIComponent(pathname.split("/").pop() || "");
+      fileName = fileName.trim() || "document";
+      if (!fileName.toLowerCase().endsWith(".pdf")) fileName += ".pdf";
+
+      const formData = new FormData();
       console.log(`Fetched PDF: ${fileName} (${pdfBlob.size} bytes)`);
-      formData.append("file", pdfBlob, fileName);
+      formData.append(
+        "file",
+        new Blob([pdfBlob], { type: "application/pdf" }),
+        fileName,
+      );
 
       formData.append("saveReason", selectedReason);
       formData.append("userNote", userNote);
@@ -102,7 +123,12 @@ document.getElementById("save-btn").addEventListener("click", async () => {
     }
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        // Token expired or invalid: forget it so the user is told to log in again
+        chrome.storage.local.remove("jwtToken");
+        throw new Error("Please log in at the dashboard first!");
+      }
       throw new Error(errorData.error || "Server rejected the request");
     }
 

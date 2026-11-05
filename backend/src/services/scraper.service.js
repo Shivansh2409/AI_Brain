@@ -12,7 +12,14 @@ const scrapeWebpage = async (url) => {
     // 1. Launch the hidden browser
     browser = await puppeteer.launch({
       headless: true, // true means it runs invisibly. Set to false if you want to watch it work!
-      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Prevents crashes on servers
+      // --no-sandbox: Chromium's sandbox needs privileges a container doesn't have.
+      // --disable-dev-shm-usage: write shared memory to /tmp if /dev/shm is small.
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
     });
 
     const page = await browser.newPage();

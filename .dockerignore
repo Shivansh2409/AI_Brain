@@ -5,7 +5,14 @@
 **/.env.*
 **/.DS_Store
 **/*.log
+**/*.md
+**/.vscode
+**/.idea
 .git
+.gitignore
+Dockerfile
+docker-compose.yml
+.dockerignore
 backend/uploads
 backend/public
 brain-extension
