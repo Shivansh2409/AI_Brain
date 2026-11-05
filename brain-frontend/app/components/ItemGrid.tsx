@@ -7,6 +7,8 @@ interface ItemGridProps {
   items: any[];
   isLoading: boolean;
   isSearchResult: boolean;
+  /** true when a type/topic filter is narrowing the list */
+  isFiltered?: boolean;
   onItemLink: (item: any) => void;
 }
 
@@ -30,6 +32,7 @@ export default function ItemGrid({
   items,
   isLoading,
   isSearchResult,
+  isFiltered = false,
   onItemLink,
 }: ItemGridProps) {
   if (isLoading) {
@@ -49,12 +52,18 @@ export default function ItemGrid({
           <Sparkles className="text-fuchsia-300" size={22} />
         </div>
         <h3 className="text-lg font-semibold text-zinc-100">
-          {isSearchResult ? "Nothing matched that search" : "Nothing here yet"}
+          {isSearchResult
+            ? "Nothing matched that search"
+            : isFiltered
+              ? "Nothing in this filter yet"
+              : "Nothing here yet"}
         </h3>
         <p className="mt-2 text-sm text-zinc-400">
           {isSearchResult
             ? "Try describing the idea in different words. Search works on meaning, not exact keywords."
-            : "Save pages, videos, PDFs and images with the browser extension and they'll appear here."}
+            : isFiltered
+              ? "Try another topic or type, or choose All to see everything."
+              : "Save pages, videos, PDFs and images with the browser extension and they'll appear here."}
         </p>
       </div>
     );

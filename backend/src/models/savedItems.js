@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { CATEGORY_IDS } = require("../constants/categories");
 
 const savedItemSchema = new mongoose.Schema(
   {
@@ -26,6 +27,12 @@ const savedItemSchema = new mongoose.Schema(
       type: String,
       enum: ["article", "tweet", "youtube", "pdf", "image", "unknown"],
       default: "unknown",
+    },
+    // Topic category chosen by Gemini (see src/constants/categories.js)
+    category: {
+      type: String,
+      enum: CATEGORY_IDS,
+      default: "other",
     },
     metadata: {
       type: mongoose.Schema.Types.Mixed, // Perfect for flexible, unstructured data

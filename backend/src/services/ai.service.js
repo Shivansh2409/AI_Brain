@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { CATEGORY_PROMPT_LIST } = require("../constants/categories");
 require("dotenv").config();
 
 // Initialize the Gemini client
@@ -31,7 +32,9 @@ const generateSummaryAndTags = async (text, saveReason, userNote) => {
       Analyze the following text and user context. 
       1. Provide a 2-sentence summary.
       2. Provide exactly 15 to 20 highly specific relevant tags/keywords. I am going to use these tax and keywords for showing the edges in the graph so make it clear and consistent
-      Respond strictly with a JSON object using this exact schema: { "summary": "string", "tags": ["string", "string"] }
+      3. Pick the ONE category id that best fits the content from this list:
+${CATEGORY_PROMPT_LIST}
+      Respond strictly with a JSON object using this exact schema: { "summary": "string", "tags": ["string", "string"], "category": "one of the category ids above" }
       
       Text: ${text}
 
@@ -76,7 +79,9 @@ const generateImageSummaryAndTags = async (base64Image, mimeType) => {
       1. Extract any readable text from it.
       2. Provide a 2-sentence summary of what the image shows or means.
       3. Provide exactly 15 to 20 highly specific relevant tags/keywords.
-      Respond strictly with a JSON object using this exact schema: { "summary": "string", "tags": ["string", "string"] }
+      4. Pick the ONE category id that best fits the image from this list:
+${CATEGORY_PROMPT_LIST}
+      Respond strictly with a JSON object using this exact schema: { "summary": "string", "tags": ["string", "string"], "category": "one of the category ids above" }
     `;
 
     const imagePart = {

@@ -1,6 +1,7 @@
 const fs = require("fs").promises; // ✅ RIGHT: This allows async/await!
 const { PDFParse } = require("pdf-parse");
 const SavedItem = require("../models/savedItems");
+const { normalizeCategory } = require("../constants/categories");
 const { scrapeWebpage } = require("./scraper.service");
 const { scrapeYouTube } = require("./youtube.service");
 const { fetchImageForGemini } = require("./media.service"); // <-- Import new service
@@ -33,7 +34,7 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     /\/image\/|\/img\//i.test(lowerUrl);
 
   let title, content, itemType;
-  let summary, tags;
+  let summary, tags, aiCategory;
 
   // 2. ROUTE AND PROCESS
   if (isYouTube) {
@@ -44,6 +45,7 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     const aiData = await generateSummaryAndTags(content, saveReason, userNote);
     summary = aiData.summary;
     tags = aiData.tags;
+    aiCategory = aiData.category;
   } else if (isImage) {
     console.log(`[Pipeline] Detected Image. Activating Gemini Vision...`);
     const imgData = await fetchImageForGemini(url);
@@ -59,6 +61,7 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     );
     summary = aiData.summary;
     tags = aiData.tags;
+    aiCategory = aiData.category;
   } else {
     // Default to standard webpage
     const webData = await scrapeWebpage(url);
@@ -68,6 +71,7 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     const aiData = await generateSummaryAndTags(content, saveReason, userNote);
     summary = aiData.summary;
     tags = aiData.tags;
+    aiCategory = aiData.category;
   }
 
   // 3. GENERATE EMBEDDING & SAVE (Same for all types!)
@@ -82,6 +86,7 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     tags,
     embedding,
     itemType,
+    category: normalizeCategory(aiCategory, { tags, title }),
     saveReason,
     userNote,
     userId,
@@ -161,6 +166,10 @@ const processAndSaveFile = async (
       tags: aiData.tags,
       embedding: embedding,
       itemType: itemType,
+      category: normalizeCategory(aiData.category, {
+        tags: aiData.tags,
+        title: originalName,
+      }),
       saveReason: saveReason || "General Reference",
       userNote: userNote || "",
       userId: userId,

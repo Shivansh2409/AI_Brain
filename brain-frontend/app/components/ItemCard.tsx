@@ -2,6 +2,7 @@
 
 import { ArrowUpRight, Link2 } from "lucide-react";
 import { formatDate, isWebUrl, typeMeta } from "../lib/itemTypes";
+import { categoryMeta } from "../lib/categories";
 
 interface ItemCardProps {
   item: any;
@@ -21,6 +22,20 @@ export function TypeBadge({ type }: { type?: string }) {
   );
 }
 
+export function CategoryBadge({ category }: { category?: string }) {
+  if (!category) return null;
+  const { label, color, icon: Icon } = categoryMeta(category);
+  return (
+    <span
+      className="inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium"
+      style={{ color, background: `${color}14` }}
+    >
+      <Icon size={11} className="shrink-0" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
 export default function ItemCard({ item, onLink }: ItemCardProps) {
   const linkedCount = item.linkedItems?.length ?? 0;
 
@@ -33,8 +48,13 @@ export default function ItemCard({ item, onLink }: ItemCardProps) {
       />
 
       <div className="mb-4 flex items-center justify-between gap-2">
-        <TypeBadge type={item.itemType} />
-        <span className="text-xs text-zinc-500">{formatDate(item.createdAt)}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TypeBadge type={item.itemType} />
+          <CategoryBadge category={item.category} />
+        </div>
+        <span className="shrink-0 text-xs text-zinc-500">
+          {formatDate(item.createdAt)}
+        </span>
       </div>
 
       <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-zinc-100">

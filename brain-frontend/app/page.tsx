@@ -8,6 +8,9 @@ import ProtectedLayout from "./components/ProtectedLayout";
 import Header from "./components/Header";
 import SearchBar from "./components/SearchBar";
 import CategoryFilter from "./components/CategoryFilter";
+import TopicFilter from "./components/TopicFilter";
+import { categoryMeta } from "./lib/categories";
+import { typeMeta } from "./lib/itemTypes";
 import ItemGrid from "./components/ItemGrid";
 import LinkingModal from "./components/LinkingModal";
 import KnowledgeGraph from "./components/KnowledgeGraph";
@@ -29,7 +32,9 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "graph">("grid");
-  const [activeCategory, setActiveCategory] = useState("all");
+  const [activeCategory, setActiveCategory] = useState("all"); // item type
+  const [activeTopic, setActiveTopic] = useState("all"); // topic category
+  const [topicCounts, setTopicCounts] = useState<Record<string, number> | null>(null);
   const [linkingSource, setLinkingSource] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
 
@@ -91,26 +96,46 @@ export default function Dashboard() {
   );
 
   const fetchFeed = useCallback(
-    (category: string) =>
+    (type: string, topic: string) =>
       loadItems(
-        `/api/feed?type=${encodeURIComponent(category)}`,
+        `/api/feed?type=${encodeURIComponent(type)}&category=${encodeURIComponent(topic)}`,
         (b: any) => b,
         null,
       ),
     [loadItems],
   );
 
-  // Fetch data whenever the active category changes
-  // (switchCategory clears the search, so the feed is always what's wanted)
+  // Fetch data whenever the type or topic filter changes
+  // (switching a filter clears the search, so the feed is always what's wanted)
   useEffect(() => {
-    fetchFeed(activeCategory);
-  }, [activeCategory, fetchFeed]);
+    fetchFeed(activeCategory, activeTopic);
+  }, [activeCategory, activeTopic, fetchFeed]);
+
+  // How many items each topic has (hides empty topic chips)
+  const loadTopicCounts = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/feed/counts");
+      if (!res.ok) return;
+      const body = await res.json();
+      setTopicCounts(
+        Object.fromEntries(
+          (body.categories ?? []).map((c: { id: string; count: number }) => [c.id, c.count]),
+        ),
+      );
+    } catch {
+      // counts are optional; UnauthorizedError is handled by the feed request
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTopicCounts();
+  }, [loadTopicCounts]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim();
     if (!query) {
-      fetchFeed(activeCategory);
+      fetchFeed(activeCategory, activeTopic);
       return;
     }
 
@@ -124,15 +149,30 @@ export default function Dashboard() {
 
   const clearSearch = () => {
     setSearchQuery("");
-    fetchFeed(activeCategory);
+    fetchFeed(activeCategory, activeTopic);
   };
 
   const switchCategory = (category: string) => {
     setSearchQuery("");
     setIsSearching(false);
-    if (category === activeCategory) fetchFeed(category);
+    if (category === activeCategory) fetchFeed(category, activeTopic);
     setActiveCategory(category);
   };
+
+  const switchTopic = (topic: string) => {
+    setSearchQuery("");
+    setIsSearching(false);
+    if (topic === activeTopic) fetchFeed(activeCategory, topic);
+    setActiveTopic(topic);
+  };
+
+  // e.g. "Tech & Dev · Articles" when filters are on
+  const filterLabel = [
+    activeTopic !== "all" ? categoryMeta(activeTopic).label : null,
+    activeCategory !== "all" ? `${typeMeta(activeCategory).label}s` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const firstName = user?.name?.split(" ")[0];
 
@@ -179,10 +219,18 @@ export default function Dashboard() {
                   onSubmit={handleSearch}
                   isSearching={isSearching}
                   footer={
-                    <CategoryFilter
-                      activeCategory={activeCategory}
-                      onCategoryChange={switchCategory}
-                    />
+                    <div className="space-y-2.5">
+                      <CategoryFilter
+                        activeCategory={activeCategory}
+                        onCategoryChange={switchCategory}
+                      />
+                      <div className="h-px bg-white/6" />
+                      <TopicFilter
+                        activeTopic={activeTopic}
+                        onTopicChange={switchTopic}
+                        counts={topicCounts}
+                      />
+                    </div>
                   }
                 />
               </div>
@@ -203,7 +251,7 @@ export default function Dashboard() {
                 <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold tracking-tight text-white">
-                      {activeSearch ? "Search results" : "Your library"}
+                      {activeSearch ? "Search results" : filterLabel || "Your library"}
                     </h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       {isLoading
@@ -235,6 +283,7 @@ export default function Dashboard() {
                     items={items}
                     isLoading={isLoading}
                     isSearchResult={!!activeSearch}
+                    isFiltered={activeCategory !== "all" || activeTopic !== "all"}
                     onItemLink={setLinkingSource}
                   />
                 )}
@@ -262,7 +311,7 @@ export default function Dashboard() {
             sourceItem={linkingSource}
             allItems={items}
             onClose={() => setLinkingSource(null)}
-            onRefresh={() => fetchFeed(activeCategory)}
+            onRefresh={() => fetchFeed(activeCategory, activeTopic)}
           />
         )}
       </div>

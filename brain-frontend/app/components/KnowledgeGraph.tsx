@@ -11,6 +11,7 @@ import {
   Network,
   Orbit,
   Plus,
+  Shapes,
   X,
 } from "lucide-react";
 import {
@@ -21,13 +22,14 @@ import {
   isWebUrl,
   typeMeta,
 } from "../lib/itemTypes";
-import { TypeBadge } from "./ItemCard";
+import { CategoryBadge, TypeBadge } from "./ItemCard";
+import { CATEGORIES, categoryMeta } from "../lib/categories";
 
 const GraphCanvas = dynamic(() => import("./GraphCanvas"), { ssr: false });
 
 /* ------------------------------------------------------------------ types */
 
-type Mode = "topics" | "network";
+type Mode = "categories" | "topics" | "network";
 type NodeKind = "core" | "item" | "topic";
 type LinkKind = "core" | "topic" | "manual" | "similar";
 
@@ -40,6 +42,7 @@ interface GNode {
   item?: any;
   count?: number; // topic: number of items
   share?: number; // topic: % of items
+  group?: "tag" | "category"; // what a hub node represents
   x?: number;
   y?: number;
   fx?: number;
@@ -122,6 +125,7 @@ function buildTopicGraph(items: any[]) {
       size: 8 + Math.min(count, 10) * 0.6,
       count,
       share: Math.round((count / items.length) * 100),
+      group: "tag" as const,
     })),
     ...items.map(itemNode),
   ];
@@ -144,6 +148,49 @@ function buildTopicGraph(items: any[]) {
       links.push({ source: `topic:${t}`, target: item._id, kind: "topic" });
     }
   }
+
+  return { nodes, links: [...links, ...manualLinks(items)] };
+}
+
+/** Brain at the centre → one hub per category → items in that category. */
+function buildCategoryGraph(items: any[]) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const id = categoryMeta(item.category).id;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  const nodes: GNode[] = [
+    { id: CORE_ID, kind: "core", label: "Your Brain", color: CORE_COLOR, size: 16, fx: 0, fy: 0 },
+    // keep the canonical category order so colours/positions feel stable
+    ...CATEGORIES.filter((c) => counts.has(c.id)).map((c) => {
+      const count = counts.get(c.id)!;
+      return {
+        id: `category:${c.id}`,
+        kind: "topic" as const,
+        label: c.label,
+        color: c.color,
+        size: 8 + Math.min(count, 12) * 0.6,
+        count,
+        share: Math.round((count / items.length) * 100),
+        group: "category" as const,
+      };
+    }),
+    ...items.map(itemNode),
+  ];
+
+  const links: GLink[] = [
+    ...[...counts.keys()].map((id) => ({
+      source: CORE_ID,
+      target: `category:${id}`,
+      kind: "core" as const,
+    })),
+    ...items.map((item) => ({
+      source: `category:${categoryMeta(item.category).id}`,
+      target: item._id,
+      kind: "topic" as const,
+    })),
+  ];
 
   return { nodes, links: [...links, ...manualLinks(items)] };
 }
@@ -298,7 +345,7 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [mode, setMode] = useState<Mode>("topics");
+  const [mode, setMode] = useState<Mode>("categories");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const fittedRef = useRef(false);
@@ -321,7 +368,12 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
   }, []);
 
   const graphData = useMemo(
-    () => (mode === "topics" ? buildTopicGraph(items) : buildNetworkGraph(items)),
+    () =>
+      mode === "categories"
+        ? buildCategoryGraph(items)
+        : mode === "topics"
+          ? buildTopicGraph(items)
+          : buildNetworkGraph(items),
     [items, mode],
   );
 
@@ -478,8 +530,8 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
     return [
       { label: "Items", value: items.length },
       {
-        label: mode === "topics" ? "Topics" : "Similar pairs",
-        value: mode === "topics"
+        label: mode === "network" ? "Similar pairs" : mode === "topics" ? "Topics" : "Categories",
+        value: mode !== "network"
           ? graphData.nodes.filter((n) => n.kind === "topic").length
           : count("similar"),
       },
@@ -540,7 +592,8 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
       <div className="glass absolute top-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-2xl p-1">
         {(
           [
-            { id: "topics", label: "Topics", icon: Orbit },
+            { id: "categories", label: "Categories", icon: Shapes },
+            { id: "topics", label: "Tags", icon: Orbit },
             { id: "network", label: "Network", icon: Network },
           ] as const
         ).map(({ id, label, icon: Icon }) => (
@@ -548,7 +601,13 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
             key={id}
             onClick={() => setMode(id)}
             aria-pressed={mode === id}
-            title={id === "topics" ? "Group items around their main topics" : "Connect items that share tags"}
+            title={
+              id === "categories"
+                ? "Group items by category (Tech, Design, AI…)"
+                : id === "topics"
+                  ? "Group items around their most common tags"
+                  : "Connect items that share tags"
+            }
             className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[13px] font-medium transition ${
               mode === id ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white"
             }`}
@@ -583,10 +642,13 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
           Legend
         </p>
         <ul className="space-y-1.5 text-xs text-zinc-300">
-          {mode === "topics" && (
+          {mode !== "network" && (
             <>
               <LegendDot color={CORE_COLOR} label="Your brain" />
-              <LegendDot color={TOPIC_COLOR} label="Topic" />
+              <LegendDot
+                color={mode === "categories" ? "#60a5fa" : TOPIC_COLOR}
+                label={mode === "categories" ? "Category (own colour)" : "Tag"}
+              />
             </>
           )}
           {Object.values(ITEM_TYPES).map((t) => (
@@ -617,10 +679,12 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
           <div className="flex items-start justify-between gap-3 border-b border-white/6 p-4">
             {selected.kind === "topic" ? (
               <div>
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-pink-300/80 uppercase">
-                  Topic
+                <p className="text-[10px] font-semibold tracking-[0.14em] uppercase" style={{ color: selected.color }}>
+                  {selected.group === "category" ? "Category" : "Tag"}
                 </p>
-                <h3 className="mt-1 text-lg font-semibold text-white">#{selected.label}</h3>
+                <h3 className="mt-1 text-lg font-semibold text-white">
+                  {selected.group === "category" ? selected.label : `#${selected.label}`}
+                </h3>
                 <p className="text-xs text-zinc-400">
                   {selected.count} items · {selected.share}% of your library
                 </p>
@@ -629,6 +693,7 @@ export default function KnowledgeGraph({ items, onItemLink }: KnowledgeGraphProp
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <TypeBadge type={selected.item?.itemType} />
+                  <CategoryBadge category={selected.item?.category} />
                   <span className="text-xs text-zinc-500">
                     {formatDate(selected.item?.createdAt)}
                   </span>
