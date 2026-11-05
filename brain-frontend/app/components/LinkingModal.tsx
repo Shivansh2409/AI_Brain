@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { typeMeta } from "../lib/itemTypes";
 import { useRouter } from "next/navigation";
 import { authFetch, UnauthorizedError } from "../lib/api";
 
 interface LinkingModalProps {
   sourceItem: any;
   allItems: any[];
-  activeCategory: string;
   onClose: () => void;
   onRefresh: () => void;
 }
@@ -15,13 +16,20 @@ interface LinkingModalProps {
 export default function LinkingModal({
   sourceItem,
   allItems,
-  activeCategory,
   onClose,
   onRefresh,
 }: LinkingModalProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // Link or unlink, and only close the modal if the server accepted it
   const updateLink = async (action: "link" | "unlink", targetId: string) => {
@@ -55,17 +63,57 @@ export default function LinkingModal({
   const handleLink = (targetId: string) => updateLink("link", targetId);
   const handleUnlink = (targetId: string) => updateLink("unlink", targetId);
 
+  const others = allItems.filter((item: any) => item._id !== sourceItem._id);
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? others.filter((item: any) => item.title?.toLowerCase().includes(q))
+    : others;
+
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="link-modal-title"
+    >
+      <div
+        className="glass flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-[#0b0b10]/90"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700 p-6">
-          <h2 className="text-xl font-bold text-white line-clamp-1 mb-1">
-            🔗 Connect: {sourceItem.title}
-          </h2>
-          <p className="text-sm text-slate-400">
-            Link this item to others in your knowledge graph
-          </p>
+        <div className="border-b border-white/6 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-[0.14em] text-amber-300/80 uppercase">
+                Connect
+              </p>
+              <h2
+                id="link-modal-title"
+                className="mt-1 line-clamp-1 text-lg font-semibold text-white"
+              >
+                {sourceItem.title}
+              </h2>
+              <p className="text-sm text-zinc-400">
+                Link it to related items. Links show up in gold on the graph.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-zinc-400 hover:bg-white/5 hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by title…"
+            aria-label="Filter items by title"
+            className="mt-4 w-full rounded-xl border border-white/8 bg-black/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-white/20 focus:outline-none"
+          />
           {error && (
             <p role="alert" className="mt-3 text-sm text-red-400">
               {error}
@@ -74,56 +122,57 @@ export default function LinkingModal({
         </div>
 
         {/* Content */}
-        <div className="flex-grow overflow-y-auto p-6 space-y-3">
-          {allItems
-            .filter((item: any) => item._id !== sourceItem._id)
-            .map((targetItem: any) => {
-              const isLinked = sourceItem.linkedItems?.includes(targetItem._id);
+        <div className="flex-1 space-y-2 overflow-y-auto p-4">
+          {visible.length === 0 && (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              No other items to link.
+            </p>
+          )}
+          {visible.map((targetItem: any) => {
+            const isLinked = sourceItem.linkedItems?.includes(targetItem._id);
+            const meta = typeMeta(targetItem.itemType);
 
-              return (
-                <div
-                  key={targetItem._id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 hover:bg-slate-800 transition group"
-                >
-                  <div className="flex-grow pr-4 min-w-0">
-                    <div className="font-semibold text-slate-100 line-clamp-1 group-hover:text-blue-300 transition">
+            return (
+              <div
+                key={targetItem._id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/6 bg-white/2 p-3 transition hover:border-white/15 hover:bg-white/4"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: meta.color, boxShadow: `0 0 8px ${meta.color}` }}
+                  />
+                  <div className="min-w-0">
+                    <div className="line-clamp-1 text-sm font-medium text-zinc-100">
                       {targetItem.title}
                     </div>
-                    <div className="text-xs text-slate-400 mt-1 capitalize">
-                      {targetItem.itemType} • {targetItem.saveReason}
+                    <div className="mt-0.5 text-xs text-zinc-500">
+                      {meta.label}
+                      {targetItem.saveReason ? ` · ${targetItem.saveReason}` : ""}
                     </div>
                   </div>
-
-                  {isLinked ? (
-                    <button
-                      onClick={() => handleUnlink(targetItem._id)}
-                      disabled={pendingId !== null}
-                      className="disabled:opacity-50 shrink-0 px-4 py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-600/50 hover:border-red-400 rounded-lg text-sm font-medium transition duration-300 shadow-lg hover:shadow-red-500/50"
-                    >
-                      Unlink
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleLink(targetItem._id)}
-                      disabled={pendingId !== null}
-                      className="disabled:opacity-50 shrink-0 px-4 py-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-600/50 hover:border-blue-400 rounded-lg text-sm font-medium transition duration-300 shadow-lg hover:shadow-blue-500/50"
-                    >
-                      Link
-                    </button>
-                  )}
                 </div>
-              );
-            })}
-        </div>
 
-        {/* Footer */}
-        <div className="border-t border-slate-700 p-6 bg-slate-900/50">
-          <button
-            onClick={onClose}
-            className="w-full py-2.5 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 rounded-lg font-medium transition duration-300 text-slate-100 shadow-lg"
-          >
-            Done
-          </button>
+                {isLinked ? (
+                  <button
+                    onClick={() => handleUnlink(targetItem._id)}
+                    disabled={pendingId !== null}
+                    className="shrink-0 rounded-full border border-amber-400/30 bg-amber-400/10 px-3.5 py-1.5 text-[13px] font-medium text-amber-200 transition hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                  >
+                    {pendingId === targetItem._id ? "…" : "Linked"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleLink(targetItem._id)}
+                    disabled={pendingId !== null}
+                    className="shrink-0 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-black transition hover:bg-zinc-200 disabled:opacity-50"
+                  >
+                    {pendingId === targetItem._id ? "…" : "Link"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

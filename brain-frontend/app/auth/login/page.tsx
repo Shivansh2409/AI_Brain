@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Brain, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import AuthShell, { Field, SubmitButton } from "../../components/AuthShell";
 import { API_BASE } from "../../lib/api";
 
 export default function LoginPage() {
@@ -50,95 +51,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Brain className="text-blue-500" size={40} />
-            <h1 className="text-3xl font-bold text-white">AI Second Brain</h1>
-          </div>
-          <p className="text-slate-400">Welcome back to your knowledge hub</p>
-        </div>
-
-        {/* Form Card */}
-        <div className="bg-slate-800 rounded-lg shadow-xl p-8 border border-slate-700">
-          <h2 className="text-2xl font-bold text-white mb-6">Login</h2>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="you@example.com"
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                placeholder="••••••••"
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-              />
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-medium rounded-lg transition flex items-center justify-center gap-2"
-            >
-              {loading ? "Logging in..." : "Login"}
-              {!loading && <ArrowRight size={18} />}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-slate-700"></div>
-            <span className="text-slate-400 text-sm">or</span>
-            <div className="flex-1 h-px bg-slate-700"></div>
-          </div>
-
-          {/* Register Link */}
-          <p className="text-center text-slate-400">
-            Don't have an account?{" "}
-            <Link
-              href="/auth/register"
-              className="text-blue-500 hover:text-blue-400 font-medium"
-            >
-              Sign up here
-            </Link>
-          </p>
-        </div>
-
-        {/* Footer Note */}
-        <p className="text-center text-slate-500 text-xs mt-6">
-          Your data is encrypted and securely stored
-        </p>
-      </div>
-    </div>
+    <AuthShell
+      title="Welcome back"
+      subtitle="Log in to search everything you've saved."
+      error={error}
+      footer={
+        <>
+          New here?{" "}
+          <Link href="/auth/register" className="font-medium text-white hover:text-violet-300">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field
+          label="Email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          placeholder="you@example.com"
+        />
+        <Field
+          label="Password"
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+          placeholder="••••••••"
+        />
+        <SubmitButton loading={loading}>
+          {loading ? "Logging in…" : "Log in"}
+          {!loading && <ArrowRight size={17} />}
+        </SubmitButton>
+      </form>
+    </AuthShell>
   );
 }

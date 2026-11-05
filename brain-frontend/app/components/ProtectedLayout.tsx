@@ -31,7 +31,7 @@ export default function ProtectedLayout({
 
   // Don't show the protected page until we know the user is logged in.
   if (!hasToken) {
-    return <div className="min-h-screen bg-slate-900" />;
+    return <div className="min-h-screen bg-[#050507]" />;
   }
   return <>{children}</>;
 }

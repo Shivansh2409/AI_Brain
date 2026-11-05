@@ -1,26 +1,136 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   AI Brain design tokens — a near-black canvas, dotted grid, glass panels,
+   and a violet → pink glow. Item-type colours live in app/lib/itemTypes.ts.
+--------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #050507;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --violet: #a78bfa;
+  --pink: #f472b6;
+  --gold: #fbbf24;
+  --teal: #5eead4;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(167, 139, 250, 0.35);
+}
+
+/* Thin, dark scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+@layer components {
+  /* Dotted grid backdrop */
+  .bg-dots {
+    background-image: radial-gradient(
+      rgba(255, 255, 255, 0.075) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  /* Frosted glass panel */
+  .glass {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055),
+      rgba(255, 255, 255, 0.02)
+    );
+    border: 1px solid var(--line);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 60px -24px rgba(0, 0, 0, 0.9);
+  }
+
+  /* A huge dark circle whose top edge glows like a planet's horizon.
+     Place it absolutely; everything inside it stays on a clean dark field. */
+  .horizon {
+    border-radius: 50%;
+    background: radial-gradient(
+      ellipse at 50% 0%,
+      #0d0b14 0%,
+      var(--bg) 45%
+    );
+    box-shadow:
+      0 -1px 0 0 rgba(244, 114, 182, 0.75),
+      0 -2px 18px 0 rgba(244, 114, 182, 0.45),
+      0 -24px 90px -6px rgba(167, 139, 250, 0.55),
+      0 -60px 160px -20px rgba(99, 102, 241, 0.35);
+  }
+
+  /* Soft colour wash used behind the search panel */
+  .aurora {
+    background:
+      radial-gradient(
+        40% 60% at 30% 50%,
+        rgba(99, 102, 241, 0.35),
+        transparent 70%
+      ),
+      radial-gradient(
+        40% 60% at 70% 50%,
+        rgba(244, 114, 182, 0.3),
+        transparent 70%
+      );
+    filter: blur(40px);
+  }
+
+  .text-gradient {
+    background: linear-gradient(180deg, #ffffff 30%, rgba(255, 255, 255, 0.55));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Skeleton shimmer */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
 }

@@ -1,67 +1,53 @@
 "use client";
 
-import { LayoutGrid, FileText, FileIcon, ImageIcon } from "lucide-react";
+import {
+  LayoutGrid,
+  FileText,
+  FileIcon,
+  ImageIcon,
+  Play,
+  type LucideIcon,
+} from "lucide-react";
+import { ITEM_TYPES } from "../lib/itemTypes";
 
 interface CategoryFilterProps {
   activeCategory: string;
   onCategoryChange: (category: string) => void;
 }
 
+const CATEGORIES: { id: string; label: string; icon: LucideIcon; color?: string }[] = [
+  { id: "all", label: "All", icon: LayoutGrid },
+  { id: "article", label: "Articles", icon: FileText, color: ITEM_TYPES.article.color },
+  { id: "youtube", label: "YouTube", icon: Play, color: ITEM_TYPES.youtube.color },
+  { id: "pdf", label: "PDFs", icon: FileIcon, color: ITEM_TYPES.pdf.color },
+  { id: "image", label: "Images", icon: ImageIcon, color: ITEM_TYPES.image.color },
+];
+
 export default function CategoryFilter({
   activeCategory,
   onCategoryChange,
 }: CategoryFilterProps) {
-  const categories = [
-    { id: "all", label: "All", icon: LayoutGrid, color: "blue" },
-    { id: "article", label: "Articles", icon: FileText, color: "blue" },
-    { id: "youtube", label: "YouTube", icon: null, color: "red" },
-    { id: "pdf", label: "PDFs", icon: FileIcon, color: "orange" },
-    { id: "image", label: "Images", icon: ImageIcon, color: "purple" },
-  ];
-
-  const colorClasses = {
-    blue: "bg-blue-600 border-blue-500",
-    red: "bg-red-600 border-red-500",
-    orange: "bg-orange-600 border-orange-500",
-    purple: "bg-purple-600 border-purple-500",
-  };
-
   return (
-    <div className="flex flex-wrap gap-3">
-      {categories.map((category) => {
-        const Icon = category.icon;
-        const isActive = activeCategory === category.id;
-        const colorClass =
-          colorClasses[category.color as keyof typeof colorClasses];
-
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {CATEGORIES.map(({ id, label, icon: Icon, color }) => {
+        const active = activeCategory === id;
         return (
           <button
-            key={category.id}
-            onClick={() => onCategoryChange(category.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-full border-2 transition duration-300 font-medium ${
-              isActive
-                ? `${colorClass} text-white shadow-lg scale-105`
-                : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-slate-600"
+            key={id}
+            type="button"
+            onClick={() => onCategoryChange(id)}
+            aria-pressed={active}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+              active
+                ? "border-white/20 bg-white/10 text-white"
+                : "border-white/7 bg-black/30 text-zinc-400 hover:border-white/15 hover:text-zinc-200"
             }`}
           >
-            {Icon && <Icon size={16} />}
-            {category.id === "youtube" && !Icon && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
-                <path d="m10 15 5-3-5-3z" />
-              </svg>
-            )}
-            {category.label}
+            <Icon
+              size={14}
+              style={{ color: active || !color ? undefined : color }}
+            />
+            {label}
           </button>
         );
       })}

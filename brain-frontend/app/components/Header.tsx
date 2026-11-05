@@ -1,14 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Brain, LogOut, Grid, Zap } from "lucide-react";
+import { LogOut, LayoutGrid, Network } from "lucide-react";
 import { clearSession } from "../lib/api";
+import Logo from "./Logo";
 
 interface HeaderProps {
   user: { name: string; email: string } | null;
   viewMode: "grid" | "graph";
   onViewModeChange: (mode: "grid" | "graph") => void;
 }
+
+const VIEWS = [
+  { id: "grid", label: "Library", icon: LayoutGrid },
+  { id: "graph", label: "Graph", icon: Network },
+] as const;
 
 export default function Header({
   user,
@@ -23,69 +29,60 @@ export default function Header({
   };
 
   return (
-    <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="flex items-center justify-between">
-          {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg shadow-lg">
-              <Brain className="text-white" size={32} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">AI Brain</h1>
-              <p className="text-xs text-slate-400">Knowledge Sanctuary</p>
-            </div>
-          </div>
+    <header className="sticky top-0 z-40 border-b border-white/6 bg-[#050507]/70 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+        <Logo />
 
-          {/* Center - View Mode Buttons */}
-          <div className="flex bg-slate-800 rounded-xl p-1 shadow-lg border border-slate-700">
-            <button
-              onClick={() => onViewModeChange("grid")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition duration-300 ${
-                viewMode === "grid"
-                  ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700"
-              }`}
-            >
-              <Grid size={18} />
-              <span className="text-sm font-medium">Feed</span>
-            </button>
-            <button
-              onClick={() => onViewModeChange("graph")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition duration-300 ${
-                viewMode === "graph"
-                  ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700"
-              }`}
-            >
-              <Zap size={18} />
-              <span className="text-sm font-medium">Graph</span>
-            </button>
-          </div>
+        {/* View switcher */}
+        <nav
+          aria-label="View"
+          className="flex rounded-full border border-white/10 bg-white/3 p-1"
+        >
+          {VIEWS.map(({ id, label, icon: Icon }) => {
+            const active = viewMode === id;
+            return (
+              <button
+                key={id}
+                onClick={() => onViewModeChange(id)}
+                aria-pressed={active}
+                className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition sm:px-4 ${
+                  active
+                    ? "bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                <Icon size={15} />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-          {/* Right - User Info & Logout */}
+        {/* User */}
+        <div className="flex items-center gap-2 sm:gap-3">
           {user && (
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-slate-100">
+            <>
+              <div className="hidden text-right md:block">
+                <p className="text-sm font-medium leading-tight text-zinc-100">
                   {user.name}
                 </p>
-                <p className="text-xs text-slate-400">{user.email}</p>
+                <p className="text-xs text-zinc-500">{user.email}</p>
               </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                {user.name.charAt(0).toUpperCase()}
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-linear-to-br from-violet-500 to-pink-500 text-sm font-semibold text-white">
+                {user.name?.charAt(0).toUpperCase()}
               </div>
-              <button
-                onClick={handleLogout}
-                className="p-2.5 hover:bg-red-600/20 rounded-lg transition duration-300 text-red-400 hover:text-red-300 hover:shadow-lg"
-                title="Logout"
-              >
-                <LogOut size={20} />
-              </button>
-            </div>
+            </>
           )}
+          <button
+            onClick={handleLogout}
+            title="Log out"
+            aria-label="Log out"
+            className="grid h-9 w-9 place-items-center rounded-full text-zinc-400 transition hover:bg-white/5 hover:text-white"
+          >
+            <LogOut size={17} />
+          </button>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
