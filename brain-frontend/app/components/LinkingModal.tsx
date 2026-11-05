@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE } from "../lib/api";
+
 interface LinkingModalProps {
   sourceItem: any;
   allItems: any[];
@@ -18,7 +20,7 @@ export default function LinkingModal({
   const handleLink = async (targetId: string) => {
     try {
       const token = localStorage.getItem("jwtToken");
-      await fetch("http://localhost:3000/api/link", {
+      await fetch(`${API_BASE}/api/link`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,7 +41,7 @@ export default function LinkingModal({
   const handleUnlink = async (targetId: string) => {
     try {
       const token = localStorage.getItem("jwtToken");
-      await fetch("http://localhost:3000/api/unlink", {
+      await fetch(`${API_BASE}/api/unlink`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

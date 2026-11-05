@@ -16,11 +16,6 @@ const semanticSearch = async (userQuery, userId) => {
 
   // 2. Use MongoDB's $vectorSearch aggregation to find the closest matches
   const results = await SavedItem.aggregate([
-    // {
-    //   $match: {
-    //     userId: userId, // Filter by userId first
-    //   },
-    // },
     {
       $vectorSearch: {
         index: "vector_index",

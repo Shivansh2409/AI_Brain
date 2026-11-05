@@ -1,0 +1,13 @@
+**/node_modules
+**/.next
+**/out
+**/.env
+**/.env.*
+**/.DS_Store
+**/*.log
+.git
+backend/uploads
+backend/public
+brain-extension
+brain-extension.crx
+brain-extension.pem

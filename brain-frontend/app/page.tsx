@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { API_BASE } from "./lib/api";
 import { useRouter } from "next/navigation";
 import ProtectedLayout from "./components/ProtectedLayout";
 import Header from "./components/Header";
@@ -47,7 +48,7 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("jwtToken");
       const res = await fetch(
-        `http://localhost:3000/api/feed?type=${category}`,
+        `${API_BASE}/api/feed?type=${category}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -70,7 +71,7 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("jwtToken");
       const res = await fetch(
-        `http://localhost:3000/api/search?q=${encodeURIComponent(searchQuery)}`,
+        `${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
