@@ -9,6 +9,7 @@
   "permissions": ["activeTab", "scripting", "storage", "identity"],
   "host_permissions": [
     "http://localhost:3000/*",
+    "http://localhost:3001/*",
     "*://*.googleusercontent.com/*",
     "*://drive.google.com/*",
     "*://drive.usercontent.google.com/*"

@@ -1,15 +1,39 @@
-// Get JWT from extension storage
-async function getOrFetchToken() {
-  return new Promise((resolve, reject) => {
-    // Get JWT from extension local storage
-    chrome.storage.local.get(["jwtToken"], (result) => {
-      if (result.jwtToken) {
-        resolve(result.jwtToken);
-      } else {
-        reject(new Error("Please log in at the dashboard first!"));
+const DASHBOARD_URLS = ["http://localhost:3000/*", "http://localhost:3001/*"];
+
+// Read the JWT straight from an open dashboard tab's localStorage. This works
+// even when the sync content script isn't running in that tab (e.g. the tab
+// was already open when the extension was installed or reloaded).
+async function readTokenFromDashboardTab() {
+  try {
+    const tabs = await chrome.tabs.query({ url: DASHBOARD_URLS });
+    for (const tab of tabs) {
+      try {
+        const [result] = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => localStorage.getItem("jwtToken"),
+        });
+        if (result?.result) return result.result;
+      } catch (e) {
+        console.warn("Couldn't read token from tab", tab.url, e);
       }
-    });
-  });
+    }
+  } catch (e) {
+    console.warn("Couldn't look for dashboard tabs", e);
+  }
+  return null;
+}
+
+// Get the JWT: an open dashboard tab is the freshest source (it reflects the
+// latest login/logout); fall back to the copy saved in extension storage.
+async function getOrFetchToken() {
+  const fromTab = await readTokenFromDashboardTab();
+  if (fromTab) {
+    await chrome.storage.local.set({ jwtToken: fromTab });
+    return fromTab;
+  }
+  const { jwtToken } = await chrome.storage.local.get(["jwtToken"]);
+  if (jwtToken) return jwtToken;
+  throw new Error("Please log in at the dashboard first!");
 }
 
 // Helper function to show status messages
@@ -157,12 +181,13 @@ document.getElementById("save-btn").addEventListener("click", async () => {
 // On page load, check if user is authenticated
 document.addEventListener("DOMContentLoaded", () => {
   // Check if JWT exists
-  chrome.storage.local.get(["jwtToken"], (result) => {
-    if (!result.jwtToken) {
-      const btn = document.getElementById("save-btn");
-      btn.disabled = true;
-      btn.style.opacity = "0.5";
-      showStatus("⚠️ You must log in on the dashboard first!", "warning");
-    }
+  getOrFetchToken().catch(() => {
+    const btn = document.getElementById("save-btn");
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+    showStatus(
+      "⚠️ Not logged in. Open the dashboard (localhost:3000) and log in, then reopen this popup.",
+      "warning",
+    );
   });
 });
