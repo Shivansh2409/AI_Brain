@@ -24,8 +24,11 @@ const getNodeColor = (itemType: string) => {
 };
 
 export default function KnowledgeGraph({ items }: { items: any[] }) {
-  const fgRef = useRef<any>();
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const fgRef = useRef<any>(null);
+  const [graphData, setGraphData] = useState<{
+    nodes: any[];
+    links: any[];
+  }>({ nodes: [], links: [] });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
