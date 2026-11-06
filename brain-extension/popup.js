@@ -43,6 +43,37 @@ function showStatus(message, type = "info") {
   statusMsg.className = `status ${type}`;
 }
 
+// Same colours as the dashboard's type badges
+const TYPE_STYLES = {
+  article: { label: "Article", color: "#a78bfa" },
+  youtube: { label: "YouTube", color: "#f87171" },
+  pdf: { label: "PDF", color: "#fb923c" },
+  image: { label: "Image", color: "#2dd4bf" },
+};
+
+// Mirrors how the backend decides what kind of item a URL is
+function detectType(url) {
+  const lower = url.toLowerCase();
+  if (/youtube\.com|youtu\.be/.test(lower)) return "youtube";
+  if (/drive\.google\.com\/file\/d\//.test(lower)) return "pdf";
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    if (path.endsWith(".pdf") || path.includes("/pdf/")) return "pdf";
+  } catch {
+    // not a valid URL; fall through
+  }
+  if (/\.(jpe?g|gif|png|webp|avif|svg|bmp)(\?.*|#.*)?$/.test(lower)) return "image";
+  return "article";
+}
+
+function setAuthState(state) {
+  const pill = document.getElementById("auth-state");
+  const text = document.getElementById("auth-text");
+  pill.className = `auth-state ${state}`;
+  text.textContent =
+    state === "connected" ? "Connected" : state === "signed-out" ? "Not logged in" : "Checking…";
+}
+
 // Handle Pill Selection
 let selectedReason = "Read Later";
 document.querySelectorAll(".pill").forEach((pill) => {
@@ -50,8 +81,9 @@ document.querySelectorAll(".pill").forEach((pill) => {
     document
       .querySelectorAll(".pill")
       .forEach((p) => p.classList.remove("active"));
-    e.target.classList.add("active");
-    selectedReason = e.target.getAttribute("data-reason");
+    // currentTarget is always the pill itself, even if a child was clicked
+    e.currentTarget.classList.add("active");
+    selectedReason = e.currentTarget.getAttribute("data-reason");
   });
 });
 
@@ -158,36 +190,95 @@ document.getElementById("save-btn").addEventListener("click", async () => {
 
     btn.classList.remove("loading");
     btn.classList.add("success");
-    btnText.innerText = "Saved to Brain!";
-    showStatus("✅ Successfully saved!", "success");
+    btnText.innerText = "Saved to Brain";
+    showStatus(
+      "Saved! The AI is summarising it now; it'll appear on your dashboard in a few seconds.",
+      "success",
+    );
     setTimeout(() => window.close(), 2000);
   } catch (error) {
     console.error(error);
     btn.classList.remove("loading");
     btnText.innerText = "Try Again";
-    btnIcon.style.display = "block";
+    btnIcon.style.display = "";
 
     if (error.message.includes("Please log in")) {
-      showStatus(
-        "❌ Not logged in! Open the dashboard and log in first.",
-        "error",
-      );
+      setAuthState("signed-out");
+      showStatus("You're not logged in. Open the dashboard and log in first.", "error");
     } else {
-      showStatus(`❌ Error: ${error.message}`, "error");
+      showStatus(error.message, "error");
     }
   }
 });
 
-// On page load, check if user is authenticated
-document.addEventListener("DOMContentLoaded", () => {
-  // Check if JWT exists
-  getOrFetchToken().catch(() => {
-    const btn = document.getElementById("save-btn");
+// Show the page that's about to be saved
+async function renderPagePreview() {
+  const btn = document.getElementById("save-btn");
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const url = tab?.url || "";
+
+  document.getElementById("page-title").textContent = tab?.title || url || "Untitled page";
+
+  let host = "";
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    // leave empty
+  }
+  document.getElementById("page-host").textContent = host;
+
+  const type = TYPE_STYLES[detectType(url)];
+  document.getElementById("page-type-label").textContent = type.label;
+  document.getElementById("page-type").style.setProperty("--type", type.color);
+
+  const favicon = document.getElementById("page-favicon");
+  if (tab?.favIconUrl && /^https?:|^data:/.test(tab.favIconUrl)) {
+    favicon.src = tab.favIconUrl;
+    favicon.onload = () => {
+      favicon.hidden = false;
+      document.getElementById("page-globe").style.display = "none";
+    };
+  }
+
+  // Browser pages (chrome://, the new-tab page, extension pages…) can't be saved
+  if (!/^https?:\/\//i.test(url)) {
     btn.disabled = true;
-    btn.style.opacity = "0.5";
-    showStatus(
-      "⚠️ Not logged in. Open the dashboard (localhost:3000) and log in, then reopen this popup.",
-      "warning",
-    );
-  });
+    showStatus("This page can't be saved. Open a website, video, PDF or image first.", "warning");
+    return false;
+  }
+  return true;
+}
+
+// On popup open: preview the page, then check login
+document.addEventListener("DOMContentLoaded", async () => {
+  // Show the right shortcut for the platform
+  if (!/Mac/i.test(navigator.platform)) {
+    document.getElementById("kbd-hint").textContent = "Ctrl Enter";
+  }
+
+  const saveable = await renderPagePreview();
+
+  try {
+    await getOrFetchToken();
+    setAuthState("connected");
+  } catch {
+    setAuthState("signed-out");
+    document.getElementById("save-btn").disabled = true;
+    if (saveable) {
+      showStatus(
+        "Not logged in. Open the dashboard (localhost:3000), log in, then reopen this popup.",
+        "warning",
+      );
+    }
+  }
+
+  document.getElementById("user-note").focus();
+});
+
+// ⌘/Ctrl + Enter saves from anywhere in the popup
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    const btn = document.getElementById("save-btn");
+    if (!btn.disabled) btn.click();
+  }
 });

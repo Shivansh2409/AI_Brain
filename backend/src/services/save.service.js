@@ -11,14 +11,36 @@ const {
   generateImageSummaryAndTags,
 } = require("./ai.service");
 
-const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
-  console.log(`[Pipeline] Starting process for: ${url}`);
+// Sites where the "content" is a picture (design shots, pins, photos). For
+// these, Gemini Vision looks at the page's preview image instead of reading
+// the page text, which is mostly menus and buttons.
+const VISUAL_SITES =
+  /(^|\.)(dribbble\.com|behance\.net|pinterest\.[a-z.]+|pin\.it|artstation\.com|deviantart\.com|unsplash\.com|pexels\.com|instagram\.com|mobbin\.com|awwwards\.com)$/i;
 
-  // Dedupe per user: another user having saved this URL doesn't count.
-  const existingItem = await SavedItem.findOne({ url, userId });
-  if (existingItem) return existingItem;
+const AI_FAILED = "The AI couldn't summarise this item";
 
-  // 1. DETECT CONTENT TYPE BY URL EXTENSION
+/** A readable fallback title from the URL, e.g. "Ai Brain Logo Futuristic". */
+function titleFromUrl(url) {
+  try {
+    const { hostname, pathname } = new URL(url);
+    const slug = decodeURIComponent(pathname.split("/").filter(Boolean).pop() || "")
+      .replace(/^\d+-/, "") // dribbble-style "27844289-name"
+      .replace(/\.[a-z0-9]{2,5}$/i, "")
+      .replace(/[-_+]+/g, " ")
+      .trim();
+    return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : hostname;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Works out what a URL is and asks Gemini about it. Returns every field a
+ * saved item needs except the user-specific ones. Throws on failure so the
+ * BullMQ job is retried instead of saving an empty item.
+ */
+const analyzeUrl = async (url, saveReason, userNote) => {
+  // 1. DETECT CONTENT TYPE BY URL
   const lowerUrl = url.toLowerCase();
   const isYouTube =
     lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be");
@@ -33,8 +55,7 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     // Check C: Does the URL path explicitly say it is an image API?
     /\/image\/|\/img\//i.test(lowerUrl);
 
-  let title, content, itemType;
-  let summary, tags, aiCategory;
+  let title, content, itemType, aiData;
 
   // 2. ROUTE AND PROCESS
   if (isYouTube) {
@@ -42,57 +63,92 @@ const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
     title = ytData.title;
     content = ytData.content;
     itemType = "youtube";
-    const aiData = await generateSummaryAndTags(content, saveReason, userNote);
-    summary = aiData.summary;
-    tags = aiData.tags;
-    aiCategory = aiData.category;
+    aiData = await generateSummaryAndTags(content, saveReason, userNote);
   } else if (isImage) {
     console.log(`[Pipeline] Detected Image. Activating Gemini Vision...`);
     const imgData = await fetchImageForGemini(url);
     title = imgData.title;
     content = "Image saved directly. See summary.";
     itemType = "image";
-    // Use the special Image AI function!
-    const aiData = await generateImageSummaryAndTags(
+    aiData = await generateImageSummaryAndTags(
       imgData.base64Image,
       imgData.mimeType,
       saveReason,
       userNote,
     );
-    summary = aiData.summary;
-    tags = aiData.tags;
-    aiCategory = aiData.category;
   } else {
-    // Default to standard webpage
-    const webData = await scrapeWebpage(url);
-    title = webData.title;
-    content = webData.content;
-    itemType = "article";
-    const aiData = await generateSummaryAndTags(content, saveReason, userNote);
-    summary = aiData.summary;
-    tags = aiData.tags;
-    aiCategory = aiData.category;
+    // Web page (throws if the page was empty / blocked / needs a login)
+    const web = await scrapeWebpage(url);
+    title = web.title || titleFromUrl(url);
+
+    const host = new URL(url).hostname;
+    const looksVisual =
+      web.image && (VISUAL_SITES.test(host) || web.content.trim().length < 150);
+
+    if (looksVisual) {
+      try {
+        console.log(`[Pipeline] Visual page — analysing its preview image with Gemini Vision...`);
+        const imgData = await fetchImageForGemini(web.image);
+        aiData = await generateImageSummaryAndTags(
+          imgData.base64Image,
+          imgData.mimeType,
+          saveReason,
+          userNote,
+          { title: web.title, description: web.description },
+        );
+        itemType = "image";
+        content = [web.title, web.description].filter(Boolean).join("\n\n");
+      } catch (error) {
+        console.log(`[Pipeline] Couldn't use the preview image (${error.message}); using page text.`);
+      }
+    }
+
+    if (!aiData || aiData.failed) {
+      itemType = "article";
+      // The meta description is often the best one-line summary of a page
+      content = [web.description, web.content].filter(Boolean).join("\n\n");
+      aiData = await generateSummaryAndTags(content, saveReason, userNote);
+    }
   }
 
-  // 3. GENERATE EMBEDDING & SAVE (Same for all types!)
-  console.log(`[Pipeline] Generating Vector Embedding...`);
-  const embedding = await generateEmbedding(summary + " " + title);
+  if (aiData?.failed) throw new Error(AI_FAILED);
+  const summary = aiData.summary;
+  const tags = Array.isArray(aiData.tags) ? aiData.tags : [];
+  title = (title || "").trim() || titleFromUrl(url);
 
-  const newItem = await SavedItem.create({
-    url,
+  // 3. GENERATE EMBEDDING (Same for all types!)
+  console.log(`[Pipeline] Generating Vector Embedding...`);
+  const embedding = await generateEmbedding(`${summary} ${title}`);
+  if (!embedding?.length) throw new Error("Couldn't create the search embedding");
+
+  return {
     title,
     content,
     summary,
     tags,
     embedding,
     itemType,
-    category: normalizeCategory(aiCategory, { tags, title }),
+    category: normalizeCategory(aiData.category, { tags, title }),
+  };
+};
+
+const processAndSaveUrl = async (url, saveReason, userNote, userId) => {
+  console.log(`[Pipeline] Starting process for: ${url}`);
+
+  // Dedupe per user: another user having saved this URL doesn't count.
+  const existingItem = await SavedItem.findOne({ url, userId });
+  if (existingItem) return existingItem;
+
+  const fields = await analyzeUrl(url, saveReason, userNote);
+  const newItem = await SavedItem.create({
+    url,
+    ...fields,
     saveReason,
     userNote,
     userId,
   });
 
-  console.log(`[Pipeline] ✅ Success! Item saved as: ${itemType}`);
+  console.log(`[Pipeline] ✅ Success! Item saved as: ${fields.itemType}`);
   return newItem;
 };
 
@@ -149,6 +205,7 @@ const processAndSaveFile = async (
 
     // 2. Pass the parsed text and the user's opinions directly into Gemini
     const aiData = await generateSummaryAndTags(content, saveReason, userNote);
+    if (aiData.failed) throw new Error(AI_FAILED);
 
     console.log(`[Save Service] Generating Vector Embeddings...`);
 
@@ -190,4 +247,4 @@ const processAndSaveFile = async (
   }
 };
 
-module.exports = { processAndSaveUrl, processAndSaveFile };
+module.exports = { analyzeUrl, processAndSaveUrl, processAndSaveFile };

@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --watch server.js",
-    "backfill:categories": "node scripts/backfill-categories.js"
+    "backfill:categories": "node scripts/backfill-categories.js",
+    "reprocess": "node scripts/reprocess-items.js"
   },
   "keywords": [],
   "author": "",

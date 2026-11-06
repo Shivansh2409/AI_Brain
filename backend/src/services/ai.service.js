@@ -47,7 +47,8 @@ ${CATEGORY_PROMPT_LIST}
     return JSON.parse(responseText);
   } catch (error) {
     console.error("[Gemini AI] Summarization Error:", error.message);
-    return { summary: "Failed to generate summary.", tags: ["error"] };
+    // failed: true tells the save pipeline to retry instead of saving this
+    return { summary: "Failed to generate summary.", tags: [], failed: true };
   }
 };
 
@@ -67,14 +68,31 @@ const generateEmbedding = async (text) => {
   }
 };
 
-const generateImageSummaryAndTags = async (base64Image, mimeType) => {
+// context: optional { title, description } from the page the image came from
+const generateImageSummaryAndTags = async (
+  base64Image,
+  mimeType,
+  saveReason,
+  userNote,
+  context = {},
+) => {
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash-lite",
       generationConfig: { responseMimeType: "application/json" },
     });
 
+    const pageContext = [
+      context.title && `Title of the page this image is from: "${context.title}".`,
+      context.description && `Page description: "${context.description}".`,
+      saveReason && `The user saved it for this reason: "${saveReason}".`,
+      userNote && `The user's note: "${userNote}".`,
+    ]
+      .filter(Boolean)
+      .join("\n      ");
+
     const prompt = `
+      ${pageContext ? `Context:\n      ${pageContext}\n` : ""}
       Look at this image. 
       1. Extract any readable text from it.
       2. Provide a 2-sentence summary of what the image shows or means.
@@ -98,7 +116,7 @@ ${CATEGORY_PROMPT_LIST}
     return JSON.parse(responseText);
   } catch (error) {
     console.error("[Gemini AI] Vision Error:", error.message);
-    return { summary: "Failed to analyze image.", tags: ["image-error"] };
+    return { summary: "Failed to analyze image.", tags: [], failed: true };
   }
 };
 
